@@ -210,6 +210,7 @@ function renderPlayback() {
   elements.seek.value = String(player.audio.currentTime || 0);
   for (const row of elements.playlist.children) {
     row.classList.toggle("bg-[#dcece6]", row.dataset.path === player.path);
+    row.classList.toggle("hover:bg-[#f1f6f4]", row.dataset.path !== player.path);
   }
 }
 
@@ -572,8 +573,16 @@ function render() {
   paths.forEach((path, index) => {
     const track = trackFor(path);
     const row = document.createElement("div");
-    row.className = "flex items-center gap-3 border-b border-[#e7ecec] px-4 py-1.5 text-sm last:border-b-0";
+    row.className = "flex select-none items-center gap-3 border-b border-[#e7ecec] px-4 py-1.5 text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#315e55]";
     row.dataset.path = path;
+    row.tabIndex = 0;
+    row.title = track ? "Double-click to play" : "";
+    row.addEventListener("dblclick", event => {
+      if (!event.target.closest("button") && track && !busy) playTrack(path);
+    });
+    row.addEventListener("keydown", event => {
+      if (event.key === "Enter" && event.target === row && track && !busy) playTrack(path);
+    });
     const number = document.createElement("span");
     number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
     number.textContent = String(index + 1);
@@ -594,7 +603,6 @@ function render() {
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-2";
     actions.append(
-      button("play", `Play ${track?.title || path} (${path})`, () => playTrack(path), busy || !track, true),
       button("remove", `Remove ${track?.title || path} (${path}) from playlist`, () => updatePlaylist(paths.filter((_, i) => i !== index)), busy, true));
     row.append(number, details, time, actions);
     elements.playlist.append(row);
