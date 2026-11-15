@@ -65,11 +65,12 @@
           </div>
           <div class="max-h-80 overflow-auto lg:max-h-none lg:flex-1">
             <table id="groups-table" class="hidden w-full min-w-[600px] table-fixed border-collapse text-base">
-              <colgroup><col><col id="group-albums-col" class="w-24"><col class="w-24"><col class="w-32"><col class="w-24"></colgroup>
+              <colgroup><col><col id="group-albums-col" class="w-24"><col id="group-year-col" class="hidden w-20"><col class="w-24"><col class="w-32"><col class="w-24"></colgroup>
               <thead class="sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]">
                 <tr class="border-b border-[#e1e9e7]">
                   <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-group-sort="name" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span id="group-name-heading">Artist</span><span data-sort-indicator aria-hidden="true">↑</span></button></th>
                   <th id="group-albums-heading" scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="albums" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Albums</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th id="group-year-heading" scope="col" class="hidden px-3 py-2.5 text-right"><button type="button" data-group-sort="year" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Year</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="tracks" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Tracks</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Time</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right">Actions</th>

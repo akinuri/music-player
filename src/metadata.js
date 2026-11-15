@@ -6,10 +6,16 @@ function trackNumber(value) {
   return Number.isSafeInteger(number) && number > 0 ? number : null;
 }
 
+function year(value) {
+  const match = String(value ?? "").trim().match(/^(\d{4})(?!\d)/);
+  const number = match ? Number(match[1]) : null;
+  return number > 0 ? number : null;
+}
+
 function readTags(file) {
   return new Promise(resolve => {
     jsmediatags.read(file, {
-      onSuccess: ({ tags }) => resolve({ title: typeof tags.title === "string" ? tags.title.trim() : "", artist: typeof tags.artist === "string" ? tags.artist.trim() : "", album: typeof tags.album === "string" ? tags.album.trim() : "", trackNumber: trackNumber(tags.track) }),
+      onSuccess: ({ tags }) => resolve({ title: typeof tags.title === "string" ? tags.title.trim() : "", artist: typeof tags.artist === "string" ? tags.artist.trim() : "", album: typeof tags.album === "string" ? tags.album.trim() : "", trackNumber: trackNumber(tags.track), year: year(tags.year) }),
       onError: () => resolve(null)
     });
   });
@@ -39,5 +45,5 @@ export async function readMetadata(file) {
   const issues = [];
   if (!tags) issues.push("metadata");
   if (duration === null) issues.push("duration");
-  return { title: tags?.title || "", artist: tags?.artist || "", album: tags?.album || "", trackNumber: tags?.trackNumber ?? null, duration, issues };
+  return { title: tags?.title || "", artist: tags?.artist || "", album: tags?.album || "", trackNumber: tags?.trackNumber ?? null, year: tags?.year ?? null, duration, issues };
 }

@@ -32,6 +32,7 @@ export async function scanLibrary(directory, readMetadata, onProgress = () => {}
       artist: metadata.artist || "",
       album: metadata.album || "",
       trackNumber: metadata.trackNumber ?? null,
+      year: metadata.year ?? null,
       duration: metadata.duration,
       size: file.size,
       lastModified: file.lastModified

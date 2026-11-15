@@ -48,6 +48,18 @@ test("sorts group counts and keeps entirely unknown durations last", () => {
   assert.deepEqual(sortLibraryGroups([...groups], "artist", "duration", "descending").map(group => group.key), ["C", "A", "B"]);
 });
 
+test("album year is the earliest known track year and unknown years sort last", () => {
+  const groups = groupLibraryTracks([
+    { artist: "A", album: "New", year: 2010 },
+    { artist: "A", album: "New", year: 2008 },
+    { artist: "A", album: "Old", year: 1999 },
+    { artist: "A", album: "None", year: null }
+  ], "album");
+  assert.deepEqual(groups.map(group => [group.key, group.year]), [["New", 2008], ["Old", 1999], ["None", null]]);
+  assert.deepEqual(sortLibraryGroups([...groups], "album", "year", "ascending").map(group => group.key), ["Old", "New", "None"]);
+  assert.deepEqual(sortLibraryGroups([...groups], "album", "year", "descending").map(group => group.key), ["New", "Old", "None"]);
+});
+
 test("sorts text columns in either direction with numeric ordering", () => {
   const songs = [
     { title: "Track 10", artist: "Beta", path: "b.mp3" },
