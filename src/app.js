@@ -111,17 +111,20 @@ function trackNumberText(number) {
   return Number.isSafeInteger(number) && number > 0 ? `#${number}` : "";
 }
 
+function setTitle(element, text, number) {
+  element.textContent = text;
+  const numberText = trackNumberText(number);
+  if (!numberText) return;
+  const suffix = document.createElement("span");
+  suffix.className = "font-normal text-[#a3b0b4]";
+  suffix.textContent = ` · ${numberText}`;
+  element.append(suffix);
+}
+
 function renderPlayback() {
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
-  elements["now-playing"].textContent = player.path ? track?.title || player.path : "Nothing playing";
-  const numberText = track ? trackNumberText(track.trackNumber) : "";
-  if (numberText) {
-    const number = document.createElement("span");
-    number.className = "font-normal text-[#a3b0b4]";
-    number.textContent = ` · ${numberText}`;
-    elements["now-playing"].append(number);
-  }
+  setTitle(elements["now-playing"], player.path ? track?.title || player.path : "Nothing playing", track?.trackNumber);
   const details = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "";
   elements["now-artist"].textContent = details;
   elements["now-artist"].title = details;
@@ -489,11 +492,11 @@ function render() {
     details.className = "min-w-0 flex-1";
     const title = document.createElement("p");
     title.className = "truncate text-base font-semibold text-[#263940]";
-    title.textContent = track?.title || path;
+    setTitle(title, track?.title || path, track?.trackNumber);
     title.title = path;
     const meta = document.createElement("p");
     meta.className = "mt-1.5 truncate text-base text-[#5d7079]";
-    meta.textContent = track ? [track.artist || "Unknown artist", albumText(track), trackNumberText(track.trackNumber), formatDuration(track.duration)].filter(Boolean).join(" · ") : "Not found in library";
+    meta.textContent = track ? [track.artist || "Unknown artist", albumText(track), formatDuration(track.duration)].filter(Boolean).join(" · ") : "Not found in library";
     meta.title = meta.textContent;
     details.append(title, meta);
     const actions = document.createElement("div");
