@@ -97,12 +97,10 @@
         </section>
 
         <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="saved-playlists-heading">
-          <div class="flex items-start justify-between gap-3 border-b border-[#e1e9e7] px-4 py-5 sm:px-6">
-            <div class="min-w-0">
-              <h2 id="saved-playlists-heading" class="break-words text-lg font-semibold tracking-tight"><span id="saved-title">Playlists</span> <span id="saved-count" class="text-base font-normal text-[#697a81]">0</span></h2>
-              <p id="saved-description" class="mt-1 text-base text-[#5d7079]">Saved playlists on this device</p>
-            </div>
-            <div id="saved-actions" class="flex shrink-0 gap-1"></div>
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+            <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
+            <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
+            <div id="saved-actions" class="ml-auto flex shrink-0 gap-1"></div>
           </div>
           <div class="max-h-80 overflow-y-auto lg:max-h-none lg:flex-1">
             <div id="saved-playlists"></div>

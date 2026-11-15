@@ -6,7 +6,7 @@ import { createSavedPlaylist, playlistMatchesLibrary } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-description", "saved-actions", "saved-count", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -74,11 +74,48 @@ function trackFor(path) {
   return library?.tracks.find(track => track.path === path);
 }
 
+function albumText(track) {
+  return `${track.album || "Unknown album"}${Number.isFinite(track.year) ? ` (${track.year})` : ""}`;
+}
+
+function renderCrumbs(container, crumbs) {
+  container.replaceChildren();
+  crumbs.forEach((crumb, index) => {
+    if (index) {
+      const separator = document.createElement("span");
+      separator.setAttribute("aria-hidden", "true");
+      separator.className = "font-normal";
+      separator.textContent = ">";
+      container.append(separator);
+    }
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "font-medium text-[#46685f] hover:text-[#284f48] hover:underline";
+    if (index === crumbs.length - 1) link.setAttribute("aria-current", "page");
+    link.textContent = crumb.label;
+    link.addEventListener("click", crumb.action);
+    container.append(link);
+  });
+}
+
+function renderMeta(container, items) {
+  container.replaceChildren(...items.map(text => {
+    const chip = document.createElement("span");
+    chip.className = "rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]";
+    chip.textContent = text;
+    return chip;
+  }));
+}
+
+function trackNumberText(number) {
+  return Number.isSafeInteger(number) && number > 0 ? `#${number}` : "";
+}
+
 function renderPlayback() {
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
   elements["now-playing"].textContent = player.path ? track?.title || player.path : "Nothing playing";
-  const details = track ? [track.artist || "Unknown artist", `${track.album || "Unknown album"}${Number.isFinite(track.year) ? ` (${track.year})` : ""}`].join(" · ") : "";
+  const details = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "";
   elements["now-artist"].textContent = details;
   elements["now-artist"].title = details;
   const playing = player.path && !player.audio.paused;
@@ -222,39 +259,21 @@ function render() {
       ...(artistAlbum !== null ? [{ label: albumLabel(artistAlbum), group: libraryGroup, album: artistAlbum }] : [])
     ]
     : [{ label: "Albums", group: null, album: null }, ...(libraryGroup !== null ? [{ label: albumLabel(libraryGroup), group: libraryGroup, album: null }] : [])];
-  crumbs.forEach((crumb, index) => {
-    if (index) {
-      const separator = document.createElement("span");
-      separator.setAttribute("aria-hidden", "true");
-      separator.className = "font-normal";
-      separator.textContent = ">";
-      elements["library-title"].append(separator);
-    }
-    const current = index === crumbs.length - 1;
-    const link = document.createElement("button");
-    link.type = "button";
-    link.className = "font-medium text-[#46685f] hover:text-[#284f48] hover:underline";
-    if (current) link.setAttribute("aria-current", "page");
-    link.textContent = crumb.label;
-    link.addEventListener("click", () => {
+  renderCrumbs(elements["library-title"], crumbs.map(crumb => ({
+    label: crumb.label,
+    action: () => {
       libraryGroup = crumb.group;
       artistAlbum = crumb.album;
       elements.search.value = "";
       render();
       elements["library-heading"].focus();
-    });
-    elements["library-title"].append(link);
-  });
+    }
+  })));
   const plural = (count, noun) => `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
   const meta = [];
   if (grouped) meta.push(plural(groups.length, libraryMode === "artist" && !artistAlbums ? "Artist" : "Album"));
   meta.push(plural(filtered.length, "Track"), formatTotal(filtered));
-  elements["library-meta"].replaceChildren(...meta.map(text => {
-    const chip = document.createElement("span");
-    chip.className = "rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]";
-    chip.textContent = text;
-    return chip;
-  }));
+  renderMeta(elements["library-meta"], meta);
   elements["library-meta"].classList.toggle("hidden", !library);
   elements["tracks-table"].classList.toggle("hidden", grouped);
   elements["groups-table"].classList.toggle("hidden", !grouped);
@@ -376,11 +395,19 @@ function render() {
   elements["playlist-count"].textContent = paths.length.toLocaleString();
   elements["playlist-nav-count"].textContent = savedPlaylists.length.toLocaleString();
   const selected = savedPlaylists.find(saved => saved.id === selectedPlaylistId);
-  elements["saved-title"].textContent = selected ? selected.name : "Playlists";
-  elements["saved-count"].textContent = (selected ? selected.tracks.length : savedPlaylists.length).toLocaleString();
-  elements["saved-description"].textContent = selected
-    ? `${formatTotal(selected.tracks)} · ${selected.folderName}`
-    : "Saved playlists on this device";
+  const showPlaylists = () => {
+    selectedPlaylistId = null;
+    render();
+    elements["saved-playlists-heading"].focus();
+  };
+  renderCrumbs(elements["saved-title"], [
+    { label: "Playlists", action: showPlaylists },
+    ...(selected ? [{ label: selected.name, action: () => selectPlaylist(selected) }] : [])
+  ]);
+  const savedMeta = selected
+    ? [`${selected.tracks.length.toLocaleString()} ${selected.tracks.length === 1 ? "Track" : "Tracks"}`, formatTotal(selected.tracks)]
+    : [`${savedPlaylists.length.toLocaleString()} ${savedPlaylists.length === 1 ? "Playlist" : "Playlists"}`];
+  renderMeta(elements["saved-meta"], savedMeta);
   elements["saved-empty"].textContent = selected ? "This playlist has no tracks." : "Save the current playlist to see it here.";
   elements["saved-empty"].classList.toggle("hidden", selected ? selected.tracks.length > 0 : savedPlaylists.length > 0);
   elements["saved-actions"].replaceChildren();
@@ -393,10 +420,11 @@ function render() {
     selected.tracks.forEach((track, index) => {
       const currentTrack = selectedPlaylistMatchesLibrary ? trackFor(track.path) : null;
       const trackTitle = track.title || currentTrack?.title;
+      const album = track.album || currentTrack?.album ? albumText({ album: track.album || currentTrack?.album, year: track.year ?? currentTrack?.year }) : "";
       const row = document.createElement("div");
       row.className = "flex items-start gap-3 border-b border-[#e7ecec] px-4 py-3 last:border-b-0 sm:px-6";
       const number = document.createElement("span");
-      number.className = "w-6 shrink-0 tabular-nums text-[#687c82]";
+      number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
       number.textContent = String(index + 1);
       const details = document.createElement("div");
       details.className = "min-w-0 flex-1";
@@ -404,8 +432,8 @@ function render() {
       title.className = "break-words font-medium text-[#263940]";
       title.textContent = trackTitle || track.path;
       const meta = document.createElement("p");
-      meta.className = "mt-0.5 break-words text-[#5d7079]";
-      meta.textContent = [track.artist || currentTrack?.artist, formatDuration(track.duration), trackTitle ? track.path : ""].filter(Boolean).join(" · ");
+      meta.className = "mt-1.5 break-words text-[#5d7079]";
+      meta.textContent = [track.artist || currentTrack?.artist, album, trackNumberText(track.trackNumber ?? currentTrack?.trackNumber), formatDuration(track.duration)].filter(Boolean).join(" · ");
       details.append(title, meta);
       row.append(number, details);
       elements["saved-playlists"].append(row);
@@ -423,7 +451,7 @@ function render() {
     const meta = document.createElement("span");
     meta.className = "mt-1 block break-words text-base text-[#5d7079]";
     const trackCount = saved.tracks.length;
-    meta.textContent = `${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"} · ${formatTotal(saved.tracks)} · ${saved.folderName}`;
+    meta.textContent = `${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"} · ${formatTotal(saved.tracks)}`;
     details.append(title, meta);
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-1";
@@ -448,7 +476,7 @@ function render() {
     row.className = "flex items-center gap-2 border-b border-[#e7ecec] px-4 py-3 last:border-b-0";
     row.dataset.path = path;
     const number = document.createElement("span");
-    number.className = "w-6 shrink-0 text-base tabular-nums text-[#687c82]";
+    number.className = "w-6 shrink-0 text-base tabular-nums text-[#a3b0b4]";
     number.textContent = String(index + 1);
     const details = document.createElement("div");
     details.className = "min-w-0 flex-1";
@@ -457,8 +485,9 @@ function render() {
     title.textContent = track?.title || path;
     title.title = path;
     const meta = document.createElement("p");
-    meta.className = "mt-0.5 truncate text-base text-[#5d7079]";
-    meta.textContent = track ? `${track.artist || "Unknown artist"} · ${formatDuration(track.duration)}` : "Not found in library";
+    meta.className = "mt-1.5 truncate text-base text-[#5d7079]";
+    meta.textContent = track ? [track.artist || "Unknown artist", albumText(track), trackNumberText(track.trackNumber), formatDuration(track.duration)].filter(Boolean).join(" · ") : "Not found in library";
+    meta.title = meta.textContent;
     details.append(title, meta);
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-1";

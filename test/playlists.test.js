@@ -6,14 +6,17 @@ test("saves an independent playlist snapshot, retaining missing tracks", () => {
   const handle = {};
   const library = {
     handle, folderName: "Music", playlist: ["one.mp3", "missing.mp3"],
-    tracks: [{ path: "one.mp3", title: "One", artist: "Artist", duration: 123 }]
+    tracks: [{ path: "one.mp3", title: "One", artist: "Artist", album: "Album", year: 2002, trackNumber: 5, duration: 123 }]
   };
   const saved = createSavedPlaylist("  Mix  ", library, null, "id-1");
   library.playlist.pop();
   assert.equal(saved.name, "Mix");
   assert.equal(saved.id, "id-1");
   assert.equal(saved.folderHandle, handle);
-  assert.deepEqual(saved.tracks, [{ path: "one.mp3", title: "One", artist: "Artist", duration: 123 }, { path: "missing.mp3", title: "", artist: "", duration: null }]);
+  assert.deepEqual(saved.tracks, [
+    { path: "one.mp3", title: "One", artist: "Artist", album: "Album", year: 2002, trackNumber: 5, duration: 123 },
+    { path: "missing.mp3", title: "", artist: "", album: "", year: null, trackNumber: null, duration: null }
+  ]);
 });
 
 test("replacing a playlist keeps its identity and validates the input", () => {

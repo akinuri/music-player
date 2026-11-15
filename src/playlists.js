@@ -11,7 +11,7 @@ export function createSavedPlaylist(name, library, existing, id = crypto.randomU
     folderName: library.folderName,
     tracks: library.playlist.map(path => {
       const track = tracksByPath.get(path);
-      return { path, title: track?.title || "", artist: track?.artist || "", duration: track?.duration ?? null };
+      return { path, title: track?.title || "", artist: track?.artist || "", album: track?.album || "", year: track?.year ?? null, trackNumber: track?.trackNumber ?? null, duration: track?.duration ?? null };
     }),
     savedAt: Date.now()
   };
