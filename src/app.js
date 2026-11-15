@@ -440,10 +440,10 @@ function render() {
       details.className = "min-w-0 flex-1";
       const title = document.createElement("p");
       title.className = "break-words font-medium text-[#263940]";
-      title.textContent = trackTitle || track.path;
+      setTitle(title, trackTitle || track.path, track.trackNumber ?? currentTrack?.trackNumber);
       const meta = document.createElement("p");
       meta.className = "mt-1.5 break-words text-[#5d7079]";
-      meta.textContent = [track.artist || currentTrack?.artist, album, trackNumberText(track.trackNumber ?? currentTrack?.trackNumber), formatDuration(track.duration)].filter(Boolean).join(" · ");
+      meta.textContent = [track.artist || currentTrack?.artist, album, formatDuration(track.duration)].filter(Boolean).join(" · ");
       details.append(title, meta);
       row.append(number, details);
       elements["saved-playlists"].append(row);
