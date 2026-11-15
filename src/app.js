@@ -605,7 +605,10 @@ async function updatePlaylist(paths) {
     const next = { ...library, playlist: paths };
     await saveLibrary(next);
     library = next;
-    if ((player.path && !paths.includes(player.path)) || (player.pendingPath && !paths.includes(player.pendingPath))) player.stop();
+    if ((player.path && !paths.includes(player.path)) || (player.pendingPath && !paths.includes(player.pendingPath))) {
+      player.stop();
+      clearSession();
+    }
     return true;
   } catch (error) {
     console.error("Could not save playlist:", error);
@@ -614,6 +617,60 @@ async function updatePlaylist(paths) {
   } finally {
     busy = false;
     render();
+  }
+}
+
+const SESSION_KEY = "playback-session";
+let pendingSession = null;
+let lastSessionSave = 0;
+
+function readSession() {
+  try {
+    const session = JSON.parse(localStorage.getItem(SESSION_KEY));
+    return typeof session?.path === "string" ? { path: session.path, time: Number.isFinite(session.time) ? Math.max(0, session.time) : 0, playing: session.playing === true } : null;
+  } catch (error) {
+    console.error("Could not read the saved playback position:", error);
+    return null;
+  }
+}
+
+function saveSession(force = false) {
+  // Without metadata the position is still 0, which would overwrite the saved one.
+  if (!player.path || player.audio.readyState === 0) return;
+  const now = Date.now();
+  if (!force && now - lastSessionSave < 1000) return;
+  lastSessionSave = now;
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ path: player.path, time: player.audio.currentTime || 0, playing: !player.audio.paused }));
+  } catch (error) {
+    console.error("Could not save the playback position:", error);
+  }
+}
+
+function clearSession() {
+  pendingSession = null;
+  try {
+    localStorage.removeItem(SESSION_KEY);
+  } catch (error) {
+    console.error("Could not clear the playback position:", error);
+  }
+}
+
+async function restoreSession() {
+  const session = pendingSession;
+  if (!session || !library || permission !== "granted" || player.path || player.pendingPath) return;
+  pendingSession = null;
+  if (!playlistPaths().includes(session.path) || !trackFor(session.path)) {
+    clearSession();
+    return;
+  }
+  try {
+    await player.play(library.handle, session.path, { startAt: session.time, autoplay: session.playing });
+  } catch (error) {
+    // Browsers may block autoplay after a reload; the track stays loaded and paused.
+    if (error.name === "NotAllowedError" || error.name === "AbortError") return;
+    console.error("Could not restore playback:", error);
+    clearSession();
   }
 }
 
@@ -663,6 +720,7 @@ async function runScan(handle) {
     await saveLibrary(next);
     if (!sameFolder) {
       player.stop();
+      clearSession();
       libraryGroup = null;
       artistAlbum = null;
     }
@@ -709,8 +767,10 @@ elements.reconnect.addEventListener("click", async () => {
   try {
     permission = await library.handle.requestPermission({ mode: "read" });
     render();
-    if (permission === "granted") notice("Folder reconnected. You can play tracks or rescan your library.");
-    else notice("Folder access was not granted. Reconnect or choose the folder again to play or rescan.", true);
+    if (permission === "granted") {
+      notice("Folder reconnected. You can play tracks or rescan your library.");
+      restoreSession();
+    } else notice("Folder access was not granted. Reconnect or choose the folder again to play or rescan.", true);
   } catch (error) {
     console.error("Folder reconnection failed:", error);
     notice("Couldn't reconnect this folder. Choose the folder again to restore access.", true);
@@ -782,6 +842,24 @@ elements["play-pause"].addEventListener("click", async () => {
   }
 });
 elements.seek.addEventListener("input", () => { player.audio.currentTime = Number(elements.seek.value); });
+
+player.audio.addEventListener("timeupdate", () => saveSession());
+player.audio.addEventListener("play", () => saveSession(true));
+player.audio.addEventListener("pause", () => saveSession(true));
+player.audio.addEventListener("ended", () => {
+  lastSessionSave = 0;
+  if (player.path) {
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ path: player.path, time: 0, playing: false }));
+    } catch (error) {
+      console.error("Could not save the playback position:", error);
+    }
+  }
+});
+window.addEventListener("pagehide", () => saveSession(true));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") saveSession(true);
+});
 
 function renderVolume() {
   const { volume, muted } = player.audio;
@@ -917,10 +995,12 @@ async function init() {
     return;
   }
   busy = false;
+  pendingSession = readSession();
   validateRoute();
   render();
   historyReady = true;
   refreshSelectedPlaylistMatch();
+  restoreSession();
 }
 
 init();

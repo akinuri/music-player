@@ -2,6 +2,35 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Playback } from "../src/playback.js";
 
+test("restoring a track can seek to a saved position without autoplaying", async () => {
+  const originalAudio = globalThis.Audio;
+  const originalCreate = URL.createObjectURL;
+  let playCalls = 0;
+  const listeners = {};
+  globalThis.Audio = class {
+    duration = 100;
+    currentTime = 0;
+    addEventListener(name, handler) { listeners[name] = handler; }
+    pause() {}
+    removeAttribute() {}
+    load() {}
+    async play() { playCalls++; }
+  };
+  URL.createObjectURL = () => "blob:test";
+  try {
+    const player = new Playback({ onChange() {}, onEnded() {}, onError() {} });
+    const directory = { getFileHandle: async () => ({ getFile: async () => new Blob(["audio"]) }) };
+    await player.play(directory, "song.mp3", { startAt: 42, autoplay: false });
+    listeners.loadedmetadata();
+    assert.equal(player.path, "song.mp3");
+    assert.equal(player.audio.currentTime, 42);
+    assert.equal(playCalls, 0);
+  } finally {
+    globalThis.Audio = originalAudio;
+    URL.createObjectURL = originalCreate;
+  }
+});
+
 test("stopping while a file is opening prevents it from starting later", async () => {
   const originalAudio = globalThis.Audio;
   let resolveFile;

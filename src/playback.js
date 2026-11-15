@@ -29,7 +29,7 @@ export class Playback {
     this.onChange();
   }
 
-  async play(directory, path) {
+  async play(directory, path, { startAt = 0, autoplay = true } = {}) {
     this.stop();
     const request = this.request;
     this.pendingPath = path;
@@ -39,9 +39,14 @@ export class Playback {
       this.pendingPath = null;
       this.url = URL.createObjectURL(file);
       this.path = path;
+      if (startAt > 0) {
+        this.audio.addEventListener("loadedmetadata", () => {
+          if (request === this.request && startAt < this.audio.duration) this.audio.currentTime = startAt;
+        }, { once: true });
+      }
       this.audio.src = this.url;
       this.onChange();
-      await this.audio.play();
+      if (autoplay) await this.audio.play();
     } catch (error) {
       if (request !== this.request) return;
       this.pendingPath = null;
