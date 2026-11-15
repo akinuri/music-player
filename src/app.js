@@ -6,7 +6,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -33,11 +33,36 @@ const player = new Playback({
   }
 });
 
-function notice(message, error = false, warnings = []) {
+const NOTICE_DURATION = 5000;
+const ERROR_NOTICE_DURATION = NOTICE_DURATION * 10;
+let noticeTimer = 0;
+
+function hideNotice() {
+  clearTimeout(noticeTimer);
+  elements.notice.classList.add("hidden");
+  elements.notice.classList.remove("flex");
+}
+
+// Notices dismiss themselves, errors after a longer time; in-progress messages stay.
+function notice(message, error = false, warnings = [], { sticky = false } = {}) {
+  clearTimeout(noticeTimer);
   const element = elements.notice;
   const content = elements["notice-content"];
   content.textContent = message;
-  element.className = `flex items-start gap-3 rounded-lg border px-4 py-3 text-base ${error ? "border-[#efd6ce] bg-[#fff7f4] text-[#8c4a36]" : "border-[#c9dfd3] bg-[#f2f8ee] text-forest"}`;
+  element.className = `relative overflow-hidden flex items-start gap-3 rounded-lg border px-4 py-3 text-base ${error ? "border-[#efd6ce] bg-[#fff7f4] text-[#8c4a36]" : "border-[#c9dfd3] bg-[#f2f8ee] text-forest"}`;
+  const bar = elements["notice-progress"];
+  bar.classList.toggle("hidden", sticky);
+  if (!sticky) {
+    const duration = error ? ERROR_NOTICE_DURATION : NOTICE_DURATION;
+    bar.classList.toggle("bg-[#8c4a36]/40", error);
+    bar.classList.toggle("bg-[#315e55]/50", !error);
+    bar.style.transition = "none";
+    bar.style.width = "100%";
+    bar.getBoundingClientRect();
+    bar.style.transition = `width ${duration}ms linear`;
+    bar.style.width = "0%";
+    noticeTimer = setTimeout(hideNotice, duration);
+  }
   if (warnings.length) {
     const list = document.createElement("ul");
     list.className = "mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8c4a36]";
@@ -818,9 +843,9 @@ function advance(direction) {
 async function runScan(handle) {
   busy = true;
   render();
-  notice("Scanning your folder…");
+  notice("Scanning your folder…", false, [], { sticky: true });
   try {
-    const { tracks, warnings } = await scanLibrary(handle, readMetadata, count => notice(`Scanning your folder… ${count.toLocaleString()} tracks indexed`));
+    const { tracks, warnings } = await scanLibrary(handle, readMetadata, count => notice(`Scanning your folder… ${count.toLocaleString()} tracks indexed`, false, [], { sticky: true }));
     const sameFolder = library && await library.handle.isSameEntry(handle);
     const next = { handle, folderName: handle.name, tracks, scannedAt: Date.now(), playlist: sameFolder ? playlistPaths() : [] };
     await saveLibrary(next);
@@ -853,10 +878,7 @@ async function runScan(handle) {
   }
 }
 
-elements["dismiss-notice"].addEventListener("click", () => {
-  elements.notice.classList.add("hidden");
-  elements.notice.classList.remove("flex");
-});
+elements["dismiss-notice"].addEventListener("click", hideNotice);
 elements["choose-folder"].addEventListener("click", async () => {
   try {
     const handle = await window.showDirectoryPicker({ mode: "read" });
