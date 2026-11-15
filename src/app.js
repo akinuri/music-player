@@ -399,7 +399,7 @@ function render() {
   elements["empty-title"].textContent = query ? "No tracks found" : library ? "No MP3 files found" : "No folder selected";
   elements["empty-description"].textContent = query ? "Try a different search term." : library ? "Add MP3 files to your folder and rescan to see them here." : "Choose a folder to index your MP3 files. Files are not uploaded.";
   const paths = playlistPaths();
-  elements["playlist-count"].textContent = paths.length.toLocaleString();
+  elements["playlist-count"].textContent = `${paths.length.toLocaleString()} ${paths.length === 1 ? "Track" : "Tracks"}`;
   elements["playlist-nav-count"].textContent = savedPlaylists.length.toLocaleString();
   const selected = savedPlaylists.find(saved => saved.id === selectedPlaylistId);
   const showPlaylists = () => {
@@ -480,10 +480,10 @@ function render() {
   paths.forEach((path, index) => {
     const track = trackFor(path);
     const row = document.createElement("div");
-    row.className = "flex items-center gap-2 border-b border-[#e7ecec] px-4 py-3 last:border-b-0";
+    row.className = "flex items-center gap-2 border-b border-[#e7ecec] px-4 py-2 last:border-b-0";
     row.dataset.path = path;
     const number = document.createElement("span");
-    number.className = "w-6 shrink-0 text-base tabular-nums text-[#a3b0b4]";
+    number.className = "w-6 shrink-0 self-start text-base tabular-nums text-[#a3b0b4]";
     number.textContent = String(index + 1);
     const details = document.createElement("div");
     details.className = "min-w-0 flex-1";
