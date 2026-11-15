@@ -19,6 +19,8 @@
       <symbol id="icon-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="icon-added" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="M4 6h3c5 0 5 12 10 12h3M4 18h3c2 0 3-1.5 4-3M13 9c1-1.5 2-3 4-3h3M17 3l3 3-3 3M17 15l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-export" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-import" viewBox="0 0 24 24"><path d="M12 4v11M8 11l4 4 4-4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-remove" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="icon-clear" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 19V5h7l2 2h9v12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -104,10 +106,11 @@
             <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
             <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
             <div id="saved-actions" class="ml-auto flex shrink-0 gap-1"></div>
+            <input id="import-file" type="file" accept=".json,application/json" multiple class="hidden">
           </div>
           <div class="max-h-80 overflow-y-auto lg:max-h-none lg:flex-1">
             <div id="saved-playlists"></div>
-            <p id="saved-empty" class="px-5 py-12 text-center text-base text-[#5d7079]">Save the current playlist to see it here.</p>
+            <p id="saved-empty" class="px-5 py-12 text-center text-base text-[#5d7079]">Save the current playlist or import one to see it here.</p>
           </div>
         </section>
 

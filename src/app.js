@@ -2,11 +2,11 @@ import { scanLibrary } from "./filesystem.js";
 import { readMetadata } from "./metadata.js";
 import { loadLibrary, saveLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
-import { createSavedPlaylist, generatePlaylistPaths, playlistMatchesLibrary } from "./playlists.js";
+import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, parsePlaylists, PlaylistFileError, playlistMatchesLibrary, serializePlaylists } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -155,7 +155,9 @@ const buttonTitles = {
   added: "Added to playlist",
   remove: "Remove from playlist",
   load: "Load playlist",
-  clear: "Delete playlist"
+  clear: "Delete playlist",
+  export: "Export playlist",
+  import: "Import playlists"
 };
 
 function button(icon, label, action, disabled = false, compact = false) {
@@ -431,12 +433,21 @@ function render() {
     ? [`${selected.tracks.length.toLocaleString()} ${selected.tracks.length === 1 ? "Track" : "Tracks"}`, formatTotal(selected.tracks)]
     : [`${savedPlaylists.length.toLocaleString()} ${savedPlaylists.length === 1 ? "Playlist" : "Playlists"}`];
   renderMeta(elements["saved-meta"], savedMeta);
-  elements["saved-empty"].textContent = selected ? "This playlist has no tracks." : "Save the current playlist to see it here.";
+  elements["saved-empty"].textContent = selected ? "This playlist has no tracks." : "Save the current playlist or import one to see it here.";
   elements["saved-empty"].classList.toggle("hidden", selected ? selected.tracks.length > 0 : savedPlaylists.length > 0);
   elements["saved-actions"].replaceChildren();
   elements["saved-playlists"].replaceChildren();
+  if (!selected) {
+    const exportAll = button("export", "Export all playlists", () => exportPlaylists(savedPlaylists, "playlists"), busy || !savedPlaylists.length);
+    exportAll.title = "Export all playlists";
+    elements["saved-actions"].append(
+      button("import", "Import playlists", () => elements["import-file"].click(), busy || !library),
+      exportAll
+    );
+  }
   if (selected) {
     elements["saved-actions"].append(
+      button("export", `Export playlist: ${selected.name}`, () => exportPlaylists([selected], selected.name), busy),
       button("load", `Load playlist: ${selected.name}`, () => loadPlaylist(selected), busy),
       button("clear", `Delete playlist: ${selected.name}`, () => removeSavedPlaylist(selected), busy)
     );
@@ -567,6 +578,57 @@ async function generatePlaylist() {
   if (!await updatePlaylist([...playlistPaths(), ...paths])) return;
   elements["generate-form"].classList.add("hidden");
   notice(`Added ${paths.length.toLocaleString()} random ${paths.length === 1 ? "track" : "tracks"} (${formatTotal(paths.map(trackFor))}).`);
+}
+
+function exportPlaylists(playlists, name) {
+  const fileName = `${name.replace(/[^\p{L}\p{N} _.-]+/gu, "").trim() || "playlist"}.json`;
+  const url = URL.createObjectURL(new Blob([serializePlaylists(playlists)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  notice(`Exported ${playlists.length.toLocaleString()} ${playlists.length === 1 ? "playlist" : "playlists"} to ${fileName}.`);
+}
+
+async function importPlaylists(files) {
+  if (busy || !files.length) return;
+  if (!library) {
+    notice("Choose your music folder before importing playlists.", true);
+    return;
+  }
+  busy = true;
+  render();
+  const imported = [];
+  const problems = [];
+  try {
+    const names = savedPlaylists.map(saved => saved.name);
+    for (const file of files) {
+      try {
+        if (file.size > 10 * 1024 * 1024) throw new PlaylistFileError("The file is too large.");
+        for (const parsed of parsePlaylists(await file.text())) {
+          const saved = createImportedPlaylist(parsed, library, names);
+          await saveSavedPlaylist(saved);
+          names.push(saved.name);
+          imported.push(saved);
+        }
+      } catch (error) {
+        if (!(error instanceof PlaylistFileError)) throw error;
+        problems.push(`${file.name}: ${error.message}`);
+      }
+    }
+    const summary = imported.length ? `Imported ${imported.length.toLocaleString()} ${imported.length === 1 ? "playlist" : "playlists"}.` : "";
+    notice([summary, ...problems].filter(Boolean).join(" "), problems.length > 0);
+  } catch (error) {
+    console.error("Could not import playlists:", error);
+    notice("Couldn't save the imported playlists. Your saved playlists may be incomplete.", true);
+  } finally {
+    savedPlaylists = [...savedPlaylists, ...imported];
+    busy = false;
+    render();
+  }
 }
 
 async function saveNamedPlaylist() {
@@ -882,6 +944,11 @@ elements["generate-form"].addEventListener("submit", event => {
   generatePlaylist();
 });
 elements["clear-playlist"].addEventListener("click", () => updatePlaylist([]));
+elements["import-file"].addEventListener("change", () => {
+  const files = [...elements["import-file"].files];
+  elements["import-file"].value = "";
+  importPlaylists(files);
+});
 elements.previous.addEventListener("click", () => advance(-1));
 elements.next.addEventListener("click", () => advance(1));
 elements["play-pause"].addEventListener("click", async () => {
