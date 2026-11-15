@@ -492,8 +492,8 @@ function render() {
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-1";
     actions.append(
-      button("play", `Play ${track?.title || path} (${path})`, () => playTrack(path), busy || !track),
-      button("remove", `Remove ${track?.title || path} (${path}) from playlist`, () => updatePlaylist(paths.filter((_, i) => i !== index)), busy));
+      button("play", `Play ${track?.title || path} (${path})`, () => playTrack(path), busy || !track, true),
+      button("remove", `Remove ${track?.title || path} (${path}) from playlist`, () => updatePlaylist(paths.filter((_, i) => i !== index)), busy, true));
     row.append(number, details, actions);
     elements.playlist.append(row);
   });
