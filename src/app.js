@@ -24,6 +24,7 @@ const groupSort = { artist: { key: "name", direction: "ascending" }, album: { ke
 let selectedPlaylistId = null;
 let analysisMetric = "albums";
 let analysisYear = null;
+const analysisSort = { albums: { column: 0, direction: "ascending" }, tracks: { column: null, direction: "ascending" } };
 let selectedPlaylistMatchesLibrary = false;
 let permission = "prompt";
 let busy = true;
@@ -356,34 +357,64 @@ function renderAnalysis() {
   if (!selected) return hint(`Select a year to see its ${albumsMetric ? "albums" : "tracks"}.`);
   const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
   const columns = albumsMetric
-    ? [{ label: "Album", width: "" }, { label: "Artist", width: "" }, { label: "Tracks", width: "w-24", end: true }]
-    : [{ label: "#", width: "w-16" }, { label: "Title", width: "" }, { label: "Artist", width: "" }, { label: "Album", width: "" }, { label: "Time", width: "w-24", end: true }];
+    ? [{ label: "Album", width: "" }, { label: "Artist", width: "" }, { label: "Tracks", width: "w-24", end: true, numeric: true }]
+    : [{ label: "#", width: "w-16", numeric: true }, { label: "Title", width: "" }, { label: "Artist", width: "" }, { label: "Album", width: "" }, { label: "Time", width: "w-24", end: true, numeric: true }];
   const rows = albumsMetric
     ? [...selected.albums].sort((a, b) => byName(a.key || "Unknown album", b.key || "Unknown album")).map(album => ({
       cells: [album.key || "Unknown album", groupArtistLabel(album), album.tracks.length.toLocaleString()],
+      sortValues: [album.key || "Unknown album", groupArtistLabel(album), album.tracks.length],
       album: album.key
     }))
     : [...selected.tracks].sort((a, b) => byName(a.album || "", b.album || "") || (a.trackNumber ?? Infinity) - (b.trackNumber ?? Infinity) || byName(a.title, b.title)).map(track => ({
       cells: [Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? String(track.trackNumber) : "—", track.title, track.artist || "Unknown artist", track.album || "Unknown album", formatDuration(track.duration)],
+      sortValues: [Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? track.trackNumber : null, track.title, track.artist || "Unknown artist", track.album || "Unknown album", Number.isFinite(track.duration) ? track.duration : null],
       album: track.album || null
     }));
   if (!rows.length) return hint(`No ${albumsMetric ? "albums" : "tracks"} for ${selected.year}.`);
+  const sort = analysisSort[analysisMetric];
+  if (sort.column !== null) {
+    const sign = sort.direction === "ascending" ? 1 : -1;
+    const numeric = columns[sort.column].numeric;
+    rows.sort((a, b) => {
+      const left = a.sortValues[sort.column];
+      const right = b.sortValues[sort.column];
+      if (numeric && (left === null) !== (right === null)) return left === null ? 1 : -1;
+      return sign * (numeric ? (left ?? 0) - (right ?? 0) : byName(left, right));
+    });
+  }
 
   const table = document.createElement("table");
   table.className = "w-full min-w-[480px] table-fixed border-collapse text-base";
   const colgroup = document.createElement("colgroup");
   const headRow = document.createElement("tr");
   headRow.className = "border-b border-[#e1e9e7]";
-  for (const column of columns) {
+  columns.forEach((column, index) => {
     const col = document.createElement("col");
     col.className = column.width;
     colgroup.append(col);
     const heading = document.createElement("th");
     heading.scope = "col";
     heading.className = `px-3 py-2.5 ${column.end ? "text-right" : "text-left"}`;
-    heading.textContent = column.label;
+    const active = sort.column === index;
+    if (active) heading.setAttribute("aria-sort", sort.direction);
+    const sortButton = document.createElement("button");
+    sortButton.type = "button";
+    sortButton.className = `flex w-full items-center gap-2 hover:text-[#284f48] ${column.end ? "justify-end text-right" : "text-left"}`;
+    const label = document.createElement("span");
+    label.textContent = column.label;
+    const indicator = document.createElement("span");
+    indicator.setAttribute("aria-hidden", "true");
+    indicator.className = active ? "font-bold text-[#284f48]" : "opacity-50";
+    indicator.textContent = active ? (sort.direction === "ascending" ? "↑" : "↓") : "↕";
+    sortButton.append(label, indicator);
+    sortButton.addEventListener("click", () => {
+      sort.direction = active && sort.direction === "ascending" ? "descending" : "ascending";
+      sort.column = index;
+      render();
+    });
+    heading.append(sortButton);
     headRow.append(heading);
-  }
+  });
   const thead = document.createElement("thead");
   thead.className = "sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]";
   thead.append(headRow);
