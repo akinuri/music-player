@@ -46,9 +46,9 @@
             </div>
           </nav>
           <div class="flex shrink-0 flex-wrap items-center gap-2 px-3">
-            <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-white text-[#273b44] shadow-sm hover:bg-[#f4f8f6] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
-            <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-white text-[#273b44] shadow-sm hover:bg-[#f4f8f6] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
-            <button id="rescan" type="button" aria-label="Rescan library" title="Rescan library" disabled class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-white text-[#273b44] shadow-sm hover:bg-[#f4f8f6] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-rescan"></use></svg></button>
+            <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
+            <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
+            <button id="rescan" type="button" aria-label="Rescan library" title="Rescan library" disabled class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-rescan"></use></svg></button>
           </div>
         </aside>
 
@@ -122,10 +122,10 @@
               <span id="playback-duration">—</span>
             </div>
             <div class="mt-4 flex items-center gap-2">
-              <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] hover:bg-[#eff4f4] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
+              <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
               <button id="play-pause" type="button" aria-label="Play" title="Play" disabled class="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-play"></use></svg></button>
-              <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] hover:bg-[#eff4f4] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
-              <button id="mute" type="button" aria-label="Mute" title="Mute" class="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-white text-[#28454a] hover:bg-[#e7f0ed]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-volume"></use></svg></button>
+              <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
+              <button id="mute" type="button" aria-label="Mute" title="Mute" class="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-[#f7faf9] text-[#28454a] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-volume"></use></svg></button>
               <label for="volume" class="sr-only">Volume</label><input id="volume" type="range" min="0" max="100" step="2" value="100" class="min-w-0 flex-1 accent-[#315e55]">
             </div>
           </section>
@@ -140,8 +140,8 @@
                 </div>
               </div>
               <div class="flex shrink-0 gap-1">
-                <button id="save-playlist" type="button" aria-label="Save playlist" title="Save playlist" disabled class="flex h-10 w-10 items-center justify-center rounded-md border border-[#becbd0] bg-white text-[#273b44] hover:bg-[#e6eeec] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
-                <button id="clear-playlist" type="button" aria-label="Clear playlist" title="Clear playlist" disabled class="flex h-10 w-10 items-center justify-center rounded-md border border-[#becbd0] bg-white text-[#273b44] hover:bg-[#e6eeec] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-clear"></use></svg></button>
+                <button id="save-playlist" type="button" aria-label="Save playlist" title="Save playlist" disabled class="flex h-10 w-10 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
+                <button id="clear-playlist" type="button" aria-label="Clear playlist" title="Clear playlist" disabled class="flex h-10 w-10 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-clear"></use></svg></button>
               </div>
             </div>
             <form id="save-form" class="hidden border-b border-[#e1e9e7] px-4 py-3">
@@ -149,7 +149,7 @@
               <div class="mt-2 flex gap-2">
                 <input id="playlist-name" type="text" required class="min-w-0 flex-1 rounded-md border border-[#cbd6d9] px-3 py-2 text-base outline-none focus:border-[#315e55]">
                 <button id="save-submit" type="submit" aria-label="Save named playlist" title="Save" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
-                <button id="save-cancel" type="button" aria-label="Cancel saving" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] text-[#273b44] hover:bg-[#e6eeec]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
+                <button id="save-cancel" type="button" aria-label="Cancel saving" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
               </div>
             </form>
             <div class="min-h-0 overflow-y-auto lg:flex-1">

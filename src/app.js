@@ -158,7 +158,7 @@ function button(icon, label, action, disabled = false, compact = false) {
   element.type = "button";
   element.setAttribute("aria-label", label);
   element.title = buttonTitles[icon];
-  element.className = `flex ${compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-white text-[#28454a] hover:bg-[#e7f0ed] disabled:cursor-not-allowed disabled:opacity-40`;
+  element.className = `flex ${compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-[#f7faf9] text-[#28454a] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40`;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", "h-5 w-5");
@@ -357,7 +357,7 @@ function render() {
       const missing = paths.filter(path => !playlistPaths().includes(path));
       const addGroup = () => missing.length ? updatePlaylist([...playlistPaths(), ...missing]) : Promise.resolve(true);
       const actions = document.createElement("div");
-      actions.className = "flex justify-end gap-1";
+      actions.className = "flex justify-end gap-2";
       actions.append(
         button("play", `Play ${groupMode}: ${name}`, async () => {
           if (await addGroup()) await playTrack(paths[0]);
@@ -375,7 +375,7 @@ function render() {
     row.className = "border-b border-[#e7ecec] hover:bg-[#f7faf9] last:border-b-0";
     const added = playlistPaths().includes(track.path);
     const actions = document.createElement("div");
-    actions.className = "flex justify-end gap-1";
+    actions.className = "flex justify-end gap-2";
     actions.append(
       button("play", `Play from library: ${track.title} (${track.path})`, async () => {
         if (added || await updatePlaylist([...playlistPaths(), track.path])) await playTrack(track.path);
@@ -461,7 +461,7 @@ function render() {
     meta.textContent = `${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"} · ${formatTotal(saved.tracks)}`;
     details.append(title, meta);
     const actions = document.createElement("div");
-    actions.className = "flex shrink-0 gap-1";
+    actions.className = "flex shrink-0 gap-2";
     actions.append(
       button("load", `Load playlist: ${saved.name}`, () => loadPlaylist(saved), busy),
       button("clear", `Delete playlist: ${saved.name}`, () => removeSavedPlaylist(saved), busy)
@@ -497,7 +497,7 @@ function render() {
     meta.title = meta.textContent;
     details.append(title, meta);
     const actions = document.createElement("div");
-    actions.className = "flex shrink-0 gap-1";
+    actions.className = "flex shrink-0 gap-2";
     actions.append(
       button("play", `Play ${track?.title || path} (${path})`, () => playTrack(path), busy || !track, true),
       button("remove", `Remove ${track?.title || path} (${path}) from playlist`, () => updatePlaylist(paths.filter((_, i) => i !== index)), busy, true));
