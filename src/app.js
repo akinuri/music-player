@@ -148,11 +148,50 @@ function setTitle(element, text, number) {
   element.append(suffix);
 }
 
+const TITLE_STEP_MS = 600;
+const TITLE_WINDOW = 22;
+const TITLE_HOLD_STEPS = 4;
+let titleKey = "";
+let titleTimer = 0;
+
+// While playing, long names slide back and forth through a fixed-width window in the tab title.
+function setPageTitle(text, scroll) {
+  const key = `${scroll}|${text}`;
+  if (key === titleKey) return;
+  titleKey = key;
+  clearInterval(titleTimer);
+  titleTimer = 0;
+  if (!scroll) {
+    document.title = text;
+    return;
+  }
+  const overflow = text.length - TITLE_WINDOW;
+  if (overflow <= 0) {
+    document.title = `▶ ${text}`;
+    return;
+  }
+  const forward = Array.from({ length: overflow + 1 }, (_, offset) => offset);
+  const cycle = [
+    ...Array(TITLE_HOLD_STEPS).fill(0),
+    ...forward,
+    ...Array(TITLE_HOLD_STEPS).fill(overflow),
+    ...forward.slice(0, -1).reverse()
+  ];
+  let step = 0;
+  const tick = () => {
+    const offset = cycle[step++ % cycle.length];
+    document.title = `▶ ${text.slice(offset, offset + TITLE_WINDOW)}`;
+  };
+  tick();
+  titleTimer = setInterval(tick, TITLE_STEP_MS);
+}
+
 function renderPlayback() {
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
   setTitle(elements["now-playing"], player.path ? track?.title || player.path : "Nothing playing", track?.trackNumber);
   const details = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "";
+  setPageTitle(track ? `${track.title || player.path} · ${track.artist || "Unknown artist"}` : "Music player", !!track && !player.audio.paused);
   elements["now-artist"].textContent = details;
   elements["now-artist"].title = details;
   const playing = player.path && !player.audio.paused;
