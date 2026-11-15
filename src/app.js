@@ -2,11 +2,11 @@ import { scanLibrary } from "./filesystem.js";
 import { readMetadata } from "./metadata.js";
 import { loadLibrary, saveLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
-import { createSavedPlaylist, playlistMatchesLibrary } from "./playlists.js";
+import { createSavedPlaylist, generatePlaylistPaths, playlistMatchesLibrary } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -492,6 +492,7 @@ function render() {
   elements["save-submit"].disabled = busy || !paths.length;
   elements["playlist-name"].disabled = busy;
   elements["save-cancel"].disabled = busy;
+  for (const id of ["generate-playlist", "generate-submit", "generate-minutes", "generate-cancel"]) elements[id].disabled = busy || !library;
   elements.playlist.replaceChildren();
   paths.forEach((path, index) => {
     const track = trackFor(path);
@@ -546,6 +547,26 @@ function selectPlaylist(saved) {
   selectedPlaylistMatchesLibrary = false;
   render();
   refreshSelectedPlaylistMatch();
+}
+
+async function generatePlaylist() {
+  if (busy || !library) return;
+  const minutes = Number(elements["generate-minutes"].value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    notice("Enter how many minutes of music to generate.", true);
+    elements["generate-minutes"].focus();
+    return;
+  }
+  const { paths, available } = generatePlaylistPaths(library.tracks, minutes * 60, { exclude: playlistPaths() });
+  if (!paths.length) {
+    notice(available
+      ? `No new tracks fit within ${minutes.toLocaleString()} ${minutes === 1 ? "minute" : "minutes"}. Try a longer duration.`
+      : "Every track with a known duration is already in the playlist.", true);
+    return;
+  }
+  if (!await updatePlaylist([...playlistPaths(), ...paths])) return;
+  elements["generate-form"].classList.add("hidden");
+  notice(`Added ${paths.length.toLocaleString()} random ${paths.length === 1 ? "track" : "tracks"} (${formatTotal(paths.map(trackFor))}).`);
 }
 
 async function saveNamedPlaylist() {
@@ -833,6 +854,7 @@ for (const mode of ["artist", "album", "track"]) {
 }
 elements["nav-playlists"].addEventListener("click", () => { currentView = "playlists"; selectedPlaylistId = null; render(); });
 elements["save-playlist"].addEventListener("click", () => {
+  elements["generate-form"].classList.add("hidden");
   elements["save-form"].classList.remove("hidden");
   elements["playlist-name"].focus();
 });
@@ -844,6 +866,20 @@ elements["save-cancel"].addEventListener("click", () => {
 elements["save-form"].addEventListener("submit", event => {
   event.preventDefault();
   saveNamedPlaylist();
+});
+elements["generate-playlist"].addEventListener("click", () => {
+  elements["save-form"].classList.add("hidden");
+  elements["generate-form"].classList.remove("hidden");
+  elements["generate-minutes"].focus();
+  elements["generate-minutes"].select();
+});
+elements["generate-cancel"].addEventListener("click", () => {
+  elements["generate-form"].classList.add("hidden");
+  elements["generate-playlist"].focus();
+});
+elements["generate-form"].addEventListener("submit", event => {
+  event.preventDefault();
+  generatePlaylist();
 });
 elements["clear-playlist"].addEventListener("click", () => updatePlaylist([]));
 elements.previous.addEventListener("click", () => advance(-1));

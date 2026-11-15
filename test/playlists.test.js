@@ -1,6 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSavedPlaylist, playlistMatchesLibrary } from "../src/playlists.js";
+import { createSavedPlaylist, generatePlaylistPaths, playlistMatchesLibrary } from "../src/playlists.js";
+
+test("generates a random selection within the target, skipping excluded and unmeasurable tracks", () => {
+  const tracks = [
+    { path: "a", duration: 100 },
+    { path: "b", duration: 200 },
+    { path: "c", duration: 300 },
+    { path: "d", duration: null },
+    { path: "e", duration: 50 }
+  ];
+  const first = () => 0;
+  const result = generatePlaylistPaths(tracks, 400, { exclude: ["a"], random: first });
+  assert.ok(result.duration <= 400);
+  assert.ok(!result.paths.includes("a") && !result.paths.includes("d"));
+  assert.equal(result.duration, result.paths.reduce((sum, path) => sum + tracks.find(track => track.path === path).duration, 0));
+  assert.equal(new Set(result.paths).size, result.paths.length);
+  assert.deepEqual(generatePlaylistPaths(tracks, 10), { paths: [], duration: 0, available: 4 });
+  assert.deepEqual(generatePlaylistPaths(tracks, 10000, { exclude: ["a", "b", "c", "e"] }), { paths: [], duration: 0, available: 0 });
+  assert.equal(generatePlaylistPaths(tracks, 10000).paths.length, 4);
+});
 
 test("saves an independent playlist snapshot, retaining missing tracks", () => {
   const handle = {};
