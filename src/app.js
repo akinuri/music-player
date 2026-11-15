@@ -17,6 +17,8 @@ let libraryGroup = null;
 let artistAlbum = null;
 let sortKey = "title";
 let sortDirection = "ascending";
+let currentAlbumView = null;
+let sortBeforeAlbum = null;
 const groupSort = { artist: { key: "name", direction: "ascending" }, album: { key: "name", direction: "ascending" } };
 let selectedPlaylistId = null;
 let selectedPlaylistMatchesLibrary = false;
@@ -240,6 +242,17 @@ function render() {
   const query = elements.search.value.trim().toLocaleLowerCase();
   const hideTrackArtist = libraryMode === "artist" && libraryGroup !== null && artistAlbum !== null;
   const hideTrackAlbum = (libraryMode === "artist" && artistAlbum !== null) || (libraryMode === "album" && libraryGroup !== null);
+  const albumViewKey = hideTrackAlbum ? JSON.stringify([libraryMode, libraryGroup, artistAlbum]) : null;
+  if (albumViewKey !== currentAlbumView) {
+    if (albumViewKey !== null) {
+      if (currentAlbumView === null) sortBeforeAlbum = { key: sortKey, direction: sortDirection };
+      sortKey = "trackNumber";
+      sortDirection = "ascending";
+    } else if (sortBeforeAlbum) {
+      ({ key: sortKey, direction: sortDirection } = sortBeforeAlbum);
+    }
+    currentAlbumView = albumViewKey;
+  }
   if ((hideTrackArtist && sortKey === "artist") || (hideTrackAlbum && sortKey === "album")) {
     sortKey = "title";
     sortDirection = "ascending";
