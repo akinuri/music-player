@@ -572,28 +572,31 @@ function render() {
   paths.forEach((path, index) => {
     const track = trackFor(path);
     const row = document.createElement("div");
-    row.className = "flex items-center gap-2 border-b border-[#e7ecec] px-4 py-2 last:border-b-0";
+    row.className = "flex items-center gap-3 border-b border-[#e7ecec] px-4 py-1.5 text-sm last:border-b-0";
     row.dataset.path = path;
     const number = document.createElement("span");
-    number.className = "w-6 shrink-0 self-start text-base tabular-nums text-[#a3b0b4]";
+    number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
     number.textContent = String(index + 1);
     const details = document.createElement("div");
-    details.className = "min-w-0 flex-1";
-    const title = document.createElement("p");
-    title.className = "truncate text-base font-semibold text-[#263940]";
+    details.className = "flex min-w-0 flex-1 items-baseline gap-3";
+    const title = document.createElement("span");
+    title.className = "max-w-[55%] shrink-0 truncate font-semibold text-[#263940]";
     setTitle(title, track?.title || path, track?.trackNumber);
     title.title = path;
-    const meta = document.createElement("p");
-    meta.className = "mt-1.5 truncate text-base text-[#5d7079]";
-    meta.textContent = track ? [track.artist || "Unknown artist", albumText(track), formatDuration(track.duration)].filter(Boolean).join(" · ") : "Not found in library";
+    const meta = document.createElement("span");
+    meta.className = "min-w-0 flex-1 truncate text-[#5d7079]";
+    meta.textContent = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "Not found in library";
     meta.title = meta.textContent;
     details.append(title, meta);
+    const time = document.createElement("span");
+    time.className = "shrink-0 tabular-nums text-[#5d7079]";
+    time.textContent = track ? formatDuration(track.duration) : "";
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-2";
     actions.append(
       button("play", `Play ${track?.title || path} (${path})`, () => playTrack(path), busy || !track, true),
       button("remove", `Remove ${track?.title || path} (${path}) from playlist`, () => updatePlaylist(paths.filter((_, i) => i !== index)), busy, true));
-    row.append(number, details, actions);
+    row.append(number, details, time, actions);
     elements.playlist.append(row);
   });
   renderPlayback();
