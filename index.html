@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#e6eaed">
+    <title>Music player</title>
+    <link rel="stylesheet" href="./dist/styles.css">
+    <script type="module" src="./dist/app.js"></script>
+  </head>
+  <body class="bg-[#e9eeee] text-[#202c35] antialiased">
+    <svg aria-hidden="true" class="absolute h-0 w-0 overflow-hidden" xmlns="http://www.w3.org/2000/svg">
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM14 5h4v14h-4z" fill="currentColor"/></symbol>
+      <symbol id="icon-previous" viewBox="0 0 24 24"><path d="M6 5v14M19 5 9 12l10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="icon-added" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-remove" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+      <symbol id="icon-clear" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 19V5h7l2 2h9v12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-rescan" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 9a7 7 0 0 1 12-2l3 5M19 15a7 7 0 0 1-12 2l-3-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-reconnect" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 4h12l3 3v13H4V4h1Zm3 0v6h8V4M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-load" viewBox="0 0 24 24"><path d="M4 5h10M4 10h10M4 15h6m4 0 3 3 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    </svg>
+    <main class="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-4 px-4 pb-12 pt-5 sm:px-6 lg:h-screen lg:min-h-0 lg:px-8">
+      <div id="notice" class="hidden">
+        <div id="notice-content" role="status" aria-live="polite" class="min-w-0 flex-1"></div>
+        <button id="dismiss-notice" type="button" aria-label="Dismiss notification" title="Dismiss" class="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-black/5"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-remove"></use></svg></button>
+      </div>
+      <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+        <aside class="flex shrink-0 self-stretch flex-col gap-4 lg:max-h-full lg:w-[200px] lg:self-start">
+          <nav class="flex min-h-0 flex-col rounded-xl border border-[#d6e0df] bg-white px-3 py-4 text-[#273b44] shadow-sm" aria-label="Music navigation">
+            <div class="flex min-h-0 flex-col gap-1 lg:overflow-y-auto">
+              <button id="nav-library" type="button" class="flex min-w-0 items-center justify-between rounded-md bg-[#e1eee8] px-2.5 py-2 text-left text-base font-semibold text-[#284f48] hover:bg-[#d3e6dc]"><span>Library</span><span id="track-count" class="ml-2 text-[#46685f]">0</span></button>
+              <div class="ml-3 flex flex-col gap-1 border-l border-[#d6e0df] pl-2">
+                <button id="nav-artist" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]"><span>Artists</span><span id="artist-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
+                <button id="nav-album" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]"><span>Albums</span><span id="album-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
+                <button id="nav-track" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]"><span>Tracks</span><span id="track-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
+              </div>
+              <button id="nav-playlists" type="button" class="mt-2 flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Playlists</span><span id="playlist-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
+              <div id="playlist-nav-items" class="ml-3 flex flex-col gap-1 border-l border-[#d6e0df] pl-2"></div>
+            </div>
+          </nav>
+          <div class="flex shrink-0 flex-wrap items-center gap-2 px-3">
+            <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-white text-[#273b44] shadow-sm hover:bg-[#f4f8f6] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
+            <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-white text-[#273b44] shadow-sm hover:bg-[#f4f8f6] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
+            <button id="rescan" type="button" aria-label="Rescan library" title="Rescan library" disabled class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-white text-[#273b44] shadow-sm hover:bg-[#f4f8f6] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-rescan"></use></svg></button>
+          </div>
+        </aside>
+
+        <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="library-heading">
+          <div class="border-b border-[#e1e9e7] px-4 py-5 sm:px-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title">Tracks</span> <span id="heading-count" class="text-base font-normal text-[#697a81]">0</span></h2>
+                <p class="mt-1 text-base text-[#5d7079]"><span id="folder-name" title="No folder selected">Not connected</span> · <span id="folder-status">Choose a folder to get started</span></p>
+              </div>
+              <p class="text-base text-[#5d7079]">Total duration: <span id="total-duration" class="font-medium text-[#263b42]">—</span></p>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-4">
+              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="min-w-[10rem] flex-1 rounded-md border border-[#cbd6d9] bg-[#f7f9f9] px-3 py-2 text-base outline-none placeholder:text-[#798a90] focus:border-[#315e55] focus:bg-white sm:max-w-sm">
+            </div>
+          </div>
+          <div class="max-h-80 overflow-auto lg:max-h-none lg:flex-1">
+            <table id="groups-table" class="hidden w-full min-w-[600px] table-fixed border-collapse text-base">
+              <colgroup><col><col id="group-albums-col" class="w-24"><col class="w-24"><col class="w-32"><col class="w-24"></colgroup>
+              <thead class="sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]">
+                <tr class="border-b border-[#e1e9e7]">
+                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-group-sort="name" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span id="group-name-heading">Artist</span><span data-sort-indicator aria-hidden="true">↑</span></button></th>
+                  <th id="group-albums-heading" scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="albums" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Albums</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="tracks" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Tracks</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Time</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="group-rows"></tbody>
+            </table>
+            <table id="tracks-table" class="w-full min-w-[600px] table-fixed border-collapse text-base">
+              <colgroup><col class="w-16"><col><col><col><col class="w-20"><col class="w-24"></colgroup>
+              <thead class="sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]">
+                <tr class="border-b border-[#e1e9e7]">
+                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span aria-hidden="true">#</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" aria-sort="ascending" class="px-3 py-2.5 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-[#284f48]">↑</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Time</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="track-rows"></tbody>
+            </table>
+            <div id="empty" class="px-5 py-12 text-center">
+              <h3 id="empty-title" class="text-base font-medium">No folder selected</h3>
+              <p id="empty-description" class="mt-1 text-base text-[#5d7079]">Choose a folder to index your MP3 files. Files are not uploaded.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="saved-playlists-heading">
+          <div class="flex items-start justify-between gap-3 border-b border-[#e1e9e7] px-4 py-5 sm:px-6">
+            <div class="min-w-0">
+              <h2 id="saved-playlists-heading" class="break-words text-lg font-semibold tracking-tight"><span id="saved-title">Playlists</span> <span id="saved-count" class="text-base font-normal text-[#697a81]">0</span></h2>
+              <p id="saved-description" class="mt-1 text-base text-[#5d7079]">Saved playlists on this device</p>
+            </div>
+            <div id="saved-actions" class="flex shrink-0 gap-1"></div>
+          </div>
+          <div class="max-h-80 overflow-y-auto lg:max-h-none lg:flex-1">
+            <div id="saved-playlists"></div>
+            <p id="saved-empty" class="px-5 py-12 text-center text-base text-[#5d7079]">Save the current playlist to see it here.</p>
+          </div>
+        </section>
+
+        <div class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[360px] lg:shrink-0 lg:overflow-y-auto">
+          <section class="shrink-0 rounded-xl border border-[#d6e0df] bg-white p-5 shadow-sm" aria-label="Playback controls">
+            <p class="text-base font-semibold text-[#5d7079]">Now playing</p>
+            <div class="mt-3 min-w-0">
+              <p id="now-playing" class="truncate text-base font-semibold text-[#263940]">Nothing playing</p>
+              <p id="now-artist" class="mt-1 truncate text-base text-[#5d7079]"></p>
+            </div>
+            <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-[#5d7079]">
+              <span id="elapsed">0:00</span>
+              <label for="seek" class="sr-only">Playback position</label><input id="seek" type="range" min="0" max="0" value="0" step="0.1" disabled class="min-w-0 flex-1 accent-[#315e55]">
+              <span id="playback-duration">—</span>
+            </div>
+            <div class="mt-4 flex gap-2">
+              <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-11 flex-1 items-center justify-center rounded-md border border-[#cbd6d9] hover:bg-[#eff4f4] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
+              <button id="play-pause" type="button" aria-label="Play" title="Play" disabled class="flex h-11 flex-1 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-play"></use></svg></button>
+              <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-11 flex-1 items-center justify-center rounded-md border border-[#cbd6d9] hover:bg-[#eff4f4] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
+            </div>
+          </section>
+
+          <section class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
+            <div class="flex items-start justify-between gap-2 border-b border-[#e1e9e7] px-5 py-5">
+              <div>
+                <h2 id="playlist-heading" tabindex="-1" class="text-base font-semibold">Current playlist <span id="playlist-count" class="font-normal text-[#5d7079]">0</span></h2>
+                <p class="mt-1 text-base text-[#5d7079]">Total duration: <span id="playlist-duration">—</span></p>
+              </div>
+              <div class="flex shrink-0 gap-1">
+                <button id="save-playlist" type="button" aria-label="Save playlist" title="Save playlist" disabled class="flex h-10 w-10 items-center justify-center rounded-md border border-[#becbd0] bg-white text-[#273b44] hover:bg-[#e6eeec] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
+                <button id="clear-playlist" type="button" aria-label="Clear playlist" title="Clear playlist" disabled class="flex h-10 w-10 items-center justify-center rounded-md border border-[#becbd0] bg-white text-[#273b44] hover:bg-[#e6eeec] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-clear"></use></svg></button>
+              </div>
+            </div>
+            <form id="save-form" class="hidden border-b border-[#e1e9e7] px-5 py-4">
+              <label for="playlist-name" class="block text-base font-medium">Playlist name</label>
+              <div class="mt-2 flex gap-2">
+                <input id="playlist-name" type="text" required class="min-w-0 flex-1 rounded-md border border-[#cbd6d9] px-3 py-2 text-base outline-none focus:border-[#315e55]">
+                <button id="save-submit" type="submit" aria-label="Save named playlist" title="Save" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
+                <button id="save-cancel" type="button" aria-label="Cancel saving" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] text-[#273b44] hover:bg-[#e6eeec]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
+              </div>
+            </form>
+            <div class="min-h-0 overflow-y-auto lg:flex-1">
+              <div id="playlist"></div>
+              <p id="playlist-empty" class="px-4 py-10 text-center text-base text-[#5d7079]">Add tracks from the library to start a playlist.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
