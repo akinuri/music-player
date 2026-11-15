@@ -137,6 +137,7 @@ function trackCell(value, style) {
 }
 
 function render() {
+  syncHash();
   for (const view of ["library", "playlists"]) {
     const active = currentView === view;
     const nav = elements[`nav-${view}`];
@@ -751,7 +752,71 @@ elements["play-pause"].addEventListener("click", async () => {
 });
 elements.seek.addEventListener("input", () => { player.audio.currentTime = Number(elements.seek.value); });
 
+const routeModes = { tracks: "track", artists: "artist", albums: "album" };
+let historyReady = false;
+
+function routeHash() {
+  const encode = value => encodeURIComponent(value);
+  if (currentView === "playlists") return selectedPlaylistId ? `#/playlists/${encode(selectedPlaylistId)}` : "#/playlists";
+  const segments = [`${libraryMode}s`];
+  if (libraryMode !== "track" && libraryGroup !== null) {
+    segments.push(encode(libraryGroup));
+    if (libraryMode === "artist" && artistAlbum !== null) segments.push(encode(artistAlbum));
+  }
+  return `#/${segments.join("/")}`;
+}
+
+function syncHash() {
+  const hash = routeHash();
+  if (location.hash === hash) return;
+  try {
+    history[historyReady ? "pushState" : "replaceState"](null, "", hash);
+  } catch (error) {
+    console.error("Could not update the address:", error);
+  }
+}
+
+function applyRoute() {
+  let parts;
+  try {
+    parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
+  } catch {
+    parts = [];
+  }
+  const [name, group, album] = parts;
+  if (name === "playlists") {
+    currentView = "playlists";
+    selectedPlaylistId = group || null;
+    return;
+  }
+  currentView = "library";
+  libraryMode = routeModes[name] || "track";
+  libraryGroup = libraryMode === "track" ? null : group ?? null;
+  artistAlbum = libraryMode === "artist" && libraryGroup !== null ? album ?? null : null;
+}
+
+function validateRoute() {
+  if (!library) return;
+  if (libraryMode !== "track" && libraryGroup !== null && !library.tracks.some(track => groupKey(track, libraryMode) === libraryGroup)) {
+    libraryGroup = null;
+    artistAlbum = null;
+  } else if (artistAlbum !== null && !library.tracks.some(track => groupKey(track, "artist") === libraryGroup && groupKey(track, "album") === artistAlbum)) {
+    artistAlbum = null;
+  }
+  if (selectedPlaylistId && !savedPlaylists.some(saved => saved.id === selectedPlaylistId)) selectedPlaylistId = null;
+}
+
+window.addEventListener("popstate", () => {
+  applyRoute();
+  validateRoute();
+  selectedPlaylistMatchesLibrary = false;
+  elements.search.value = "";
+  render();
+  refreshSelectedPlaylistMatch();
+});
+
 async function init() {
+  applyRoute();
   render();
   if (!("showDirectoryPicker" in window)) {
     notice("Folder access requires a modern Chromium browser and a secure context (HTTPS or localhost).", true);
@@ -772,10 +837,14 @@ async function init() {
     console.error("Could not load library:", error);
     notice("Couldn't open local storage. Check your browser's storage settings and reload.", true);
     elements["choose-folder"].disabled = true;
+    historyReady = true;
     return;
   }
   busy = false;
+  validateRoute();
   render();
+  historyReady = true;
+  refreshSelectedPlaylistMatch();
 }
 
 init();
