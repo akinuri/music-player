@@ -6,7 +6,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -256,6 +256,7 @@ function trackCell(value, style) {
 
 function render() {
   syncHash();
+  hideContextMenu();
   for (const view of ["library", "playlists"]) {
     const active = currentView === view;
     const nav = elements[`nav-${view}`];
@@ -573,41 +574,72 @@ function render() {
   paths.forEach((path, index) => {
     const track = trackFor(path);
     const row = document.createElement("div");
-    row.className = "flex select-none items-center gap-3 border-b border-[#e7ecec] px-4 py-1.5 text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#315e55]";
+    row.className = "flex select-none items-center gap-3 border-b border-[#e7ecec] px-4 py-2 text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#315e55]";
     row.dataset.path = path;
     row.tabIndex = 0;
-    row.title = track ? "Double-click to play" : "";
     row.addEventListener("dblclick", event => {
       if (!event.target.closest("button") && track && !busy) playTrack(path);
     });
     row.addEventListener("keydown", event => {
-      if (event.key === "Enter" && event.target === row && track && !busy) playTrack(path);
+      if (event.target !== row) return;
+      if (event.key === "Enter" && track && !busy) playTrack(path);
+      if (event.key === "Delete" && !busy) {
+        const next = row.nextElementSibling || row.previousElementSibling;
+        updatePlaylist(paths.filter((_, i) => i !== index)).then(() => next && elements.playlist.querySelector(`[data-path="${CSS.escape(next.dataset.path)}"]`)?.focus());
+      }
     });
     const number = document.createElement("span");
     number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
     number.textContent = String(index + 1);
     const details = document.createElement("div");
-    details.className = "flex min-w-0 flex-1 items-baseline gap-3";
+    details.className = "flex min-w-0 flex-1 items-baseline gap-2";
     const title = document.createElement("span");
     title.className = "max-w-[55%] shrink-0 truncate font-semibold text-[#263940]";
-    setTitle(title, track?.title || path, track?.trackNumber);
-    title.title = path;
+    setTitle(title, track?.title || path);
+    const dot = document.createElement("span");
+    dot.className = "shrink-0 text-[#a3b0b4]";
+    dot.setAttribute("aria-hidden", "true");
+    dot.textContent = "·";
     const meta = document.createElement("span");
     meta.className = "min-w-0 flex-1 truncate text-[#5d7079]";
-    meta.textContent = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "Not found in library";
-    meta.title = meta.textContent;
-    details.append(title, meta);
+    meta.textContent = track ? track.artist || "Unknown artist" : "Not found in library";
+    details.append(title, dot, meta);
     const time = document.createElement("span");
     time.className = "shrink-0 tabular-nums text-[#5d7079]";
     time.textContent = track ? formatDuration(track.duration) : "";
-    const actions = document.createElement("div");
-    actions.className = "flex shrink-0 gap-2";
-    actions.append(
-      button("remove", `Remove ${track?.title || path} (${path}) from playlist`, () => updatePlaylist(paths.filter((_, i) => i !== index)), busy, true));
-    row.append(number, details, time, actions);
+    row.append(number, details, time);
+    row.addEventListener("contextmenu", event => {
+      event.preventDefault();
+      openContextMenu(row, index, event);
+    });
     elements.playlist.append(row);
   });
   renderPlayback();
+}
+
+let contextRow = null;
+
+function hideContextMenu() {
+  elements["context-menu"].classList.add("hidden");
+  contextRow?.classList.remove("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
+  contextRow = null;
+}
+
+function openContextMenu(row, index, event) {
+  hideContextMenu();
+  contextRow = row;
+  contextRow.dataset.menuIndex = String(index);
+  row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
+  const menu = elements["context-menu"];
+  menu.classList.remove("hidden");
+  const keyboard = event.clientX === 0 && event.clientY === 0;
+  const bounds = row.getBoundingClientRect();
+  const x = keyboard ? bounds.left + 24 : event.clientX;
+  const y = keyboard ? bounds.bottom : event.clientY;
+  menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - menu.offsetWidth - 4))}px`;
+  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - menu.offsetHeight - 4))}px`;
+  elements["context-remove"].disabled = busy;
+  elements["context-remove"].focus();
 }
 
 async function refreshSelectedPlaylistMatch() {
@@ -1014,6 +1046,29 @@ elements["generate-cancel"].addEventListener("click", () => {
 elements["generate-form"].addEventListener("submit", event => {
   event.preventDefault();
   generatePlaylist();
+});
+elements["context-remove"].addEventListener("click", () => {
+  const index = Number(contextRow?.dataset.menuIndex);
+  const row = contextRow;
+  hideContextMenu();
+  if (Number.isInteger(index)) updatePlaylist(playlistPaths().filter((_, i) => i !== index));
+  row?.focus();
+});
+document.addEventListener("pointerdown", event => {
+  if (!event.target.closest("#context-menu")) hideContextMenu();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && contextRow) {
+    const row = contextRow;
+    hideContextMenu();
+    row.focus();
+  }
+});
+window.addEventListener("blur", hideContextMenu);
+window.addEventListener("resize", hideContextMenu);
+document.addEventListener("scroll", hideContextMenu, true);
+elements.playlist.addEventListener("contextmenu", event => {
+  if (!event.target.closest("[data-path]")) event.preventDefault();
 });
 elements["clear-playlist"].addEventListener("click", () => updatePlaylist([]));
 elements["import-file"].addEventListener("change", () => {
