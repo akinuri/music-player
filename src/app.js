@@ -3,10 +3,10 @@ import { readMetadata } from "./metadata.js";
 import { loadLibrary, saveLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
 import { createSavedPlaylist, playlistMatchesLibrary } from "./playlists.js";
-import { filterLibraryTracks, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
+import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "heading-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-year-col", "group-year-heading", "group-name-heading", "total-duration", "folder-name", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-description", "saved-actions", "saved-count", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "heading-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "total-duration", "folder-name", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-description", "saved-actions", "saved-count", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -194,6 +194,7 @@ function render() {
   const grouped = libraryMode !== "track" && (libraryGroup === null || (artistAlbums && artistAlbum === null));
   const groupMode = artistAlbums ? "album" : libraryMode;
   const groupName = (value, mode) => value || (mode === "artist" ? "Unknown artist" : "Unknown album");
+  if (groupMode === "album" && artistAlbums && groupSort.album.key === "artist") groupSort.album = { key: "name", direction: "ascending" };
   const groups = grouped ? sortLibraryGroups(groupLibraryTracks(filtered, groupMode), groupMode, groupSort[groupMode].key, groupSort[groupMode].direction) : [];
   elements["library-title"].textContent = libraryMode === "track" ? "Tracks"
     : artistAlbums ? `${groupName(libraryGroup, "artist")} · ${artistAlbum === null ? "Albums" : groupName(artistAlbum, "album")}`
@@ -201,6 +202,9 @@ function render() {
   elements["heading-count"].textContent = (grouped ? groups.length : filtered.length).toLocaleString();
   elements["tracks-table"].classList.toggle("hidden", grouped);
   elements["groups-table"].classList.toggle("hidden", !grouped);
+  const albumsPage = groupMode === "album" && !artistAlbums;
+  elements["group-artist-col"].classList.toggle("hidden", !albumsPage);
+  elements["group-artist-heading"].classList.toggle("hidden", !albumsPage);
   elements["group-albums-col"].classList.toggle("hidden", groupMode !== "artist");
   elements["group-albums-heading"].classList.toggle("hidden", groupMode !== "artist");
   elements["group-year-col"].classList.toggle("hidden", groupMode !== "album");
@@ -259,6 +263,10 @@ function render() {
       nameButton.addEventListener("click", open);
       nameCell.append(nameButton);
       row.append(nameCell);
+      if (albumsPage) {
+        const artistLabel = groupArtistLabel(group);
+        row.append(trackCell(artistLabel, "text-[#5d7079]"));
+      }
       if (groupMode === "artist") row.append(trackCell(group.albums.size.toLocaleString(), "text-right tabular-nums text-[#5d7079]"));
       if (groupMode === "album") row.append(trackCell(group.year === null ? "—" : String(group.year), "text-right tabular-nums text-[#5d7079]"));
       row.append(

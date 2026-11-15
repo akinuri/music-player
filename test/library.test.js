@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { filterLibraryTracks, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "../src/library.js";
+import { filterLibraryTracks, groupArtistLabel, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "../src/library.js";
 
 const tracks = [
   { path: "one.mp3", title: "One", artist: "Alpha", album: "Shared" },
@@ -58,6 +58,17 @@ test("album year is the earliest known track year and unknown years sort last", 
   assert.deepEqual(groups.map(group => [group.key, group.year]), [["New", 2008], ["Old", 1999], ["None", null]]);
   assert.deepEqual(sortLibraryGroups([...groups], "album", "year", "ascending").map(group => group.key), ["Old", "New", "None"]);
   assert.deepEqual(sortLibraryGroups([...groups], "album", "year", "descending").map(group => group.key), ["New", "Old", "None"]);
+});
+
+test("album artist label handles single, multiple and unknown artists, and sorts by it", () => {
+  const groups = groupLibraryTracks([
+    { artist: "Zed", album: "Solo" },
+    { artist: "Amy", album: "Mixed" },
+    { artist: "Bob", album: "Mixed" },
+    { artist: "", album: "Anon" }
+  ], "album");
+  assert.deepEqual(groups.map(groupArtistLabel), ["Zed", "Various artists", "Unknown artist"]);
+  assert.deepEqual(sortLibraryGroups([...groups], "album", "artist", "ascending").map(group => group.key), ["Anon", "Mixed", "Solo"]);
 });
 
 test("sorts text columns in either direction with numeric ordering", () => {
