@@ -6,7 +6,7 @@ import { createSavedPlaylist, playlistMatchesLibrary } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -115,6 +115,13 @@ function renderPlayback() {
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
   elements["now-playing"].textContent = player.path ? track?.title || player.path : "Nothing playing";
+  const numberText = track ? trackNumberText(track.trackNumber) : "";
+  if (numberText) {
+    const number = document.createElement("span");
+    number.className = "font-normal text-[#a3b0b4]";
+    number.textContent = ` · ${numberText}`;
+    elements["now-playing"].append(number);
+  }
   const details = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "";
   elements["now-artist"].textContent = details;
   elements["now-artist"].title = details;
@@ -865,7 +872,7 @@ function renderVolume() {
   const { volume, muted } = player.audio;
   const level = muted ? 0 : Math.round(volume * 100);
   elements.volume.value = String(level);
-  elements["volume-value"].textContent = `${level}%`;
+  elements.volume.title = `Volume ${level}%`;
   const label = muted || volume === 0 ? "Unmute" : "Mute";
   elements.mute.setAttribute("aria-label", label);
   elements.mute.title = label;
