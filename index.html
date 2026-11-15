@@ -51,17 +51,13 @@
         </aside>
 
         <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="library-heading">
-          <div class="border-b border-[#e1e9e7] px-4 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
-                <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title">Tracks</span> <span id="heading-count" class="text-base font-normal text-[#697a81]">0</span></h2>
-                <p class="mt-1 text-base text-[#5d7079]"><span id="folder-name" title="No folder selected">Not connected</span> · <span id="folder-status">Choose a folder to get started</span></p>
-              </div>
-              <p class="text-base text-[#5d7079]">Total duration: <span id="total-duration" class="font-medium text-[#263b42]">—</span></p>
+          <div class="border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
+              <div id="library-meta" class="flex flex-wrap gap-2 text-sm"></div>
+              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="ml-auto min-w-[10rem] flex-1 rounded-md border border-[#cbd6d9] bg-[#f7f9f9] px-3 py-1.5 text-base outline-none placeholder:text-[#798a90] focus:border-[#315e55] focus:bg-white sm:max-w-xs">
             </div>
-            <div class="mt-4 flex flex-wrap gap-4">
-              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="min-w-[10rem] flex-1 rounded-md border border-[#cbd6d9] bg-[#f7f9f9] px-3 py-2 text-base outline-none placeholder:text-[#798a90] focus:border-[#315e55] focus:bg-white sm:max-w-sm">
-            </div>
+            <p id="folder-status" class="mt-2 hidden text-base text-[#5d7079]"></p>
           </div>
           <div class="max-h-80 overflow-auto lg:max-h-none lg:flex-1">
             <table id="groups-table" class="hidden w-full min-w-[600px] table-fixed border-collapse text-base">
@@ -80,13 +76,13 @@
               <tbody id="group-rows"></tbody>
             </table>
             <table id="tracks-table" class="w-full min-w-[600px] table-fixed border-collapse text-base">
-              <colgroup><col class="w-16"><col><col><col><col class="w-20"><col class="w-24"></colgroup>
+              <colgroup><col class="w-16"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-20"><col class="w-24"></colgroup>
               <thead class="sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]">
                 <tr class="border-b border-[#e1e9e7]">
                   <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span aria-hidden="true">#</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
                   <th scope="col" aria-sort="ascending" class="px-3 py-2.5 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-[#284f48]">↑</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th id="track-artist-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th id="track-album-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Time</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
                 </tr>

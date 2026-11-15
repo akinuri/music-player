@@ -6,7 +6,7 @@ import { createSavedPlaylist, playlistMatchesLibrary } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "heading-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "total-duration", "folder-name", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-description", "saved-actions", "saved-count", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-description", "saved-actions", "saved-count", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "clear-playlist", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -188,7 +188,17 @@ function render() {
   elements["album-nav-count"].textContent = new Set(tracks.map(track => groupKey(track, "album"))).size.toLocaleString();
   elements["track-nav-count"].textContent = tracks.length.toLocaleString();
   const query = elements.search.value.trim().toLocaleLowerCase();
+  const hideTrackArtist = libraryMode === "artist" && libraryGroup !== null && artistAlbum !== null;
+  const hideTrackAlbum = (libraryMode === "artist" && artistAlbum !== null) || (libraryMode === "album" && libraryGroup !== null);
+  if ((hideTrackArtist && sortKey === "artist") || (hideTrackAlbum && sortKey === "album")) {
+    sortKey = "title";
+    sortDirection = "ascending";
+  }
   const filtered = sortLibraryTracks(filterLibraryTracks(tracks, libraryMode, libraryGroup, artistAlbum, query), sortKey, sortDirection);
+  for (const [name, hidden] of [["artist", hideTrackArtist], ["album", hideTrackAlbum]]) {
+    elements[`track-${name}-col`].classList.toggle("hidden", hidden);
+    elements[`track-${name}-heading`].classList.toggle("hidden", hidden);
+  }
   elements["track-count"].textContent = tracks.length.toLocaleString();
   const artistAlbums = libraryMode === "artist" && libraryGroup !== null;
   const grouped = libraryMode !== "track" && (libraryGroup === null || (artistAlbums && artistAlbum === null));
@@ -196,10 +206,53 @@ function render() {
   const groupName = (value, mode) => value || (mode === "artist" ? "Unknown artist" : "Unknown album");
   if (groupMode === "album" && artistAlbums && groupSort.album.key === "artist") groupSort.album = { key: "name", direction: "ascending" };
   const groups = grouped ? sortLibraryGroups(groupLibraryTracks(filtered, groupMode), groupMode, groupSort[groupMode].key, groupSort[groupMode].direction) : [];
-  elements["library-title"].textContent = libraryMode === "track" ? "Tracks"
-    : artistAlbums ? `${groupName(libraryGroup, "artist")} · ${artistAlbum === null ? "Albums" : groupName(artistAlbum, "album")}`
-    : grouped ? (libraryMode === "artist" ? "Artists" : "Albums") : groupName(libraryGroup, libraryMode);
-  elements["heading-count"].textContent = (grouped ? groups.length : filtered.length).toLocaleString();
+  elements["library-title"].replaceChildren();
+  const scoped = filterLibraryTracks(tracks, libraryMode, libraryGroup, artistAlbum, "");
+  const albumLabel = name => {
+    const years = scoped.map(track => track.year).filter(Number.isFinite);
+    return `${groupName(name, "album")}${years.length ? ` (${Math.min(...years)})` : ""}`;
+  };
+  const crumbs = libraryMode === "track" ? [{ label: "Tracks", group: null, album: null }]
+    : libraryMode === "artist" ? [
+      { label: "Artists", group: null, album: null },
+      ...(libraryGroup !== null ? [{ label: groupName(libraryGroup, "artist"), group: libraryGroup, album: null }] : []),
+      ...(artistAlbum !== null ? [{ label: albumLabel(artistAlbum), group: libraryGroup, album: artistAlbum }] : [])
+    ]
+    : [{ label: "Albums", group: null, album: null }, ...(libraryGroup !== null ? [{ label: albumLabel(libraryGroup), group: libraryGroup, album: null }] : [])];
+  crumbs.forEach((crumb, index) => {
+    if (index) {
+      const separator = document.createElement("span");
+      separator.setAttribute("aria-hidden", "true");
+      separator.className = "font-normal";
+      separator.textContent = ">";
+      elements["library-title"].append(separator);
+    }
+    const current = index === crumbs.length - 1;
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "font-medium text-[#46685f] hover:text-[#284f48] hover:underline";
+    if (current) link.setAttribute("aria-current", "page");
+    link.textContent = crumb.label;
+    link.addEventListener("click", () => {
+      libraryGroup = crumb.group;
+      artistAlbum = crumb.album;
+      elements.search.value = "";
+      render();
+      elements["library-heading"].focus();
+    });
+    elements["library-title"].append(link);
+  });
+  const plural = (count, noun) => `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+  const meta = [];
+  if (grouped) meta.push(plural(groups.length, libraryMode === "artist" && !artistAlbums ? "Artist" : "Album"));
+  meta.push(plural(filtered.length, "Track"), formatTotal(filtered));
+  elements["library-meta"].replaceChildren(...meta.map(text => {
+    const chip = document.createElement("span");
+    chip.className = "rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]";
+    chip.textContent = text;
+    return chip;
+  }));
+  elements["library-meta"].classList.toggle("hidden", !library);
   elements["tracks-table"].classList.toggle("hidden", grouped);
   elements["groups-table"].classList.toggle("hidden", !grouped);
   const albumsPage = groupMode === "album" && !artistAlbums;
@@ -224,10 +277,8 @@ function render() {
     indicator.classList.toggle("font-bold", active);
     indicator.classList.toggle("text-[#284f48]", active);
   }
-  elements["total-duration"].textContent = formatTotal(tracks);
-  elements["folder-name"].textContent = library?.folderName || "Not connected";
-  elements["folder-name"].title = library?.folderName || "No folder selected";
-  elements["folder-status"].textContent = !library ? "Choose a folder to get started" : permission === "granted" ? "Connected on this device" : "Permission needed to play or rescan";
+  elements["folder-status"].textContent = "Permission needed to play or rescan";
+  elements["folder-status"].classList.toggle("hidden", !library || permission === "granted");
   const folderLabel = library ? "Change folder" : "Choose folder";
   elements["choose-folder"].setAttribute("aria-label", folderLabel);
   elements["choose-folder"].title = folderLabel;
@@ -308,8 +359,8 @@ function render() {
     row.append(
       trackCell(Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? String(track.trackNumber) : "—", "tabular-nums text-[#5d7079]"),
       trackCell(track.title, "font-medium text-[#263940]"),
-      trackCell(track.artist || "Unknown artist", "text-[#5d7079]"),
-      trackCell(track.album || "Unknown album", "text-[#5d7079]"),
+      ...(hideTrackArtist ? [] : [trackCell(track.artist || "Unknown artist", "text-[#5d7079]")]),
+      ...(hideTrackAlbum ? [] : [trackCell(track.album || "Unknown album", "text-[#5d7079]")]),
       trackCell(formatDuration(track.duration), "text-right tabular-nums text-[#5d7079]"),
       actionCell
     );
