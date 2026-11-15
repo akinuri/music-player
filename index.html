@@ -49,6 +49,9 @@
               <div id="playlist-nav-items" class="ml-3 flex flex-col gap-1 border-l border-[#d6e0df] pl-2"></div>
             </div>
           </nav>
+          <nav class="shrink-0 rounded-xl border border-[#d6e0df] bg-white px-3 py-3 text-[#273b44] shadow-sm" aria-label="Analysis">
+            <button id="nav-analysis" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Analysis</span></button>
+          </nav>
           <div class="flex shrink-0 flex-wrap items-center gap-2 px-1">
             <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
             <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
@@ -112,6 +115,22 @@
           <div class="max-h-80 overflow-y-auto lg:max-h-none lg:flex-1">
             <div id="saved-playlists"></div>
             <p id="saved-empty" class="px-5 py-12 text-center text-base text-[#5d7079]">Save the current playlist or import one to see it here.</p>
+          </div>
+        </section>
+
+        <section id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="analysis-heading">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+            <h2 id="analysis-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="analysis-title" class="flex flex-wrap items-center gap-x-1.5">Analysis</span></h2>
+            <div id="analysis-meta" class="flex flex-wrap gap-2 text-sm"></div>
+            <div role="group" aria-label="Timeline measure" class="ml-auto flex overflow-hidden rounded-md border border-[#becbd0] text-sm">
+              <button id="analysis-albums" type="button" class="px-3 py-1.5">Albums</button>
+              <button id="analysis-tracks" type="button" class="border-l border-[#becbd0] px-3 py-1.5">Tracks</button>
+            </div>
+          </div>
+          <div id="analysis-empty" class="hidden px-5 py-12 text-center text-base text-[#5d7079]"></div>
+          <div id="analysis-body" class="flex min-h-0 flex-1 flex-col">
+            <div id="analysis-chart" class="flex h-64 shrink-0 gap-1 overflow-x-auto border-b border-[#e1e9e7] px-4 pt-4 sm:px-6"></div>
+            <div id="analysis-detail" class="min-h-0 flex-1 overflow-y-auto"></div>
           </div>
         </section>
 

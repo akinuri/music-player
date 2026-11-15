@@ -2,11 +2,12 @@ import { scanLibrary } from "./filesystem.js";
 import { readMetadata } from "./metadata.js";
 import { loadLibrary, saveLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
+import { buildYearTimeline } from "./analysis.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, parsePlaylists, PlaylistFileError, playlistMatchesLibrary, serializePlaylists } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "folder-status", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -21,6 +22,8 @@ let currentAlbumView = null;
 let sortBeforeAlbum = null;
 const groupSort = { artist: { key: "name", direction: "ascending" }, album: { key: "name", direction: "ascending" } };
 let selectedPlaylistId = null;
+let analysisMetric = "albums";
+let analysisYear = null;
 let selectedPlaylistMatchesLibrary = false;
 let permission = "prompt";
 let busy = true;
@@ -254,10 +257,166 @@ function trackCell(value, style) {
   return cell;
 }
 
+function openAlbum(name) {
+  currentView = "library";
+  libraryMode = "album";
+  libraryGroup = name;
+  artistAlbum = null;
+  elements.search.value = "";
+  render();
+  elements["library-heading"].focus();
+}
+
+function renderAnalysis() {
+  const timeline = buildYearTimeline(library?.tracks || []);
+  const hasYears = timeline.years.length > 0;
+  const selected = timeline.years.find(item => item.year === analysisYear);
+  const albumsMetric = analysisMetric === "albums";
+  const count = (number, noun) => `${number.toLocaleString()} ${noun}${number === 1 ? "" : "s"}`;
+  const valueOf = item => albumsMetric ? item.albums.length : item.tracks.length;
+
+  elements["analysis-empty"].textContent = library
+    ? "No release years found. Rescan the library to read years from your tags."
+    : "Choose a folder to see how your library spreads over the years.";
+  elements["analysis-empty"].classList.toggle("hidden", hasYears);
+  elements["analysis-body"].classList.toggle("hidden", !hasYears);
+  elements["analysis-body"].classList.toggle("flex", hasYears);
+  for (const [metric, buttonElement] of [["albums", elements["analysis-albums"]], ["tracks", elements["analysis-tracks"]]]) {
+    const active = metric === analysisMetric;
+    buttonElement.setAttribute("aria-pressed", String(active));
+    buttonElement.classList.toggle("bg-[#e1eee8]", active);
+    buttonElement.classList.toggle("font-semibold", active);
+    buttonElement.classList.toggle("text-[#284f48]", active);
+    buttonElement.classList.toggle("bg-[#f7faf9]", !active);
+    buttonElement.classList.toggle("hover:bg-[#e9f2ee]", !active);
+  }
+  renderCrumbs(elements["analysis-title"], [
+    { label: "Analysis", action: () => { analysisYear = null; render(); elements["analysis-heading"].focus(); } },
+    ...(selected ? [{ label: String(selected.year), action: () => render() }] : [])
+  ]);
+  renderMeta(elements["analysis-meta"], hasYears ? [
+    count(timeline.knownAlbums, "Album"),
+    count(timeline.knownTracks, "Track"),
+    timeline.min === timeline.max ? String(timeline.min) : `${timeline.min}–${timeline.max}`,
+    ...(timeline.unknownTracks ? [`${timeline.unknownTracks.toLocaleString()} without year`] : [])
+  ] : []);
+  if (!hasYears) return;
+
+  const chart = elements["analysis-chart"];
+  const scroll = chart.scrollLeft;
+  const peak = Math.max(1, ...timeline.years.map(valueOf));
+  chart.replaceChildren(...timeline.years.map(item => {
+    const value = valueOf(item);
+    const isSelected = item === selected;
+    const column = document.createElement("button");
+    column.type = "button";
+    column.className = `flex h-full w-10 shrink-0 flex-col rounded-t-md ${isSelected ? "bg-[#e1eee8]" : "hover:bg-[#f1f6f4]"}`;
+    column.setAttribute("aria-pressed", String(isSelected));
+    column.setAttribute("aria-label", `${item.year}: ${count(value, albumsMetric ? "album" : "track")}`);
+    column.addEventListener("click", () => {
+      analysisYear = isSelected ? null : item.year;
+      render();
+    });
+    const plot = document.createElement("div");
+    plot.className = "relative min-h-0 w-full flex-1";
+    if (value) {
+      const height = (value / peak) * 82;
+      const bar = document.createElement("div");
+      bar.className = `absolute bottom-0 left-1/2 w-5 -translate-x-1/2 rounded-t ${isSelected ? "bg-[#315e55]" : "bg-[#8fb8a6]"}`;
+      bar.style.height = `${height}%`;
+      const label = document.createElement("span");
+      label.className = "absolute inset-x-0 text-center text-xs tabular-nums text-[#5d7079]";
+      label.style.bottom = `calc(${height}% + 2px)`;
+      label.textContent = String(value);
+      plot.append(bar, label);
+    }
+    const year = document.createElement("span");
+    year.className = `py-1.5 text-center text-xs tabular-nums ${value ? "font-medium text-[#46685f]" : "text-[#a3b0b4]"}`;
+    year.textContent = String(item.year);
+    column.append(plot, year);
+    return column;
+  }));
+  chart.scrollLeft = scroll;
+  const selectedColumn = chart.querySelector('[aria-pressed="true"]');
+  if (selectedColumn) {
+    const left = selectedColumn.getBoundingClientRect().left - chart.getBoundingClientRect().left + chart.scrollLeft;
+    if (left < chart.scrollLeft || left + selectedColumn.offsetWidth > chart.scrollLeft + chart.clientWidth) {
+      chart.scrollLeft = left - (chart.clientWidth - selectedColumn.offsetWidth) / 2;
+    }
+  }
+
+  const detail = elements["analysis-detail"];
+  detail.replaceChildren();
+  const hint = text => {
+    const message = document.createElement("p");
+    message.className = "px-4 py-8 text-center text-base text-[#5d7079] sm:px-6";
+    message.textContent = text;
+    detail.append(message);
+  };
+  if (!selected) return hint(`Select a year to see its ${albumsMetric ? "albums" : "tracks"}.`);
+  const byName = (a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+  const columns = albumsMetric
+    ? [{ label: "Album", width: "" }, { label: "Artist", width: "" }, { label: "Tracks", width: "w-24", end: true }]
+    : [{ label: "#", width: "w-16" }, { label: "Title", width: "" }, { label: "Artist", width: "" }, { label: "Album", width: "" }, { label: "Time", width: "w-24", end: true }];
+  const rows = albumsMetric
+    ? [...selected.albums].sort((a, b) => byName(a.key || "Unknown album", b.key || "Unknown album")).map(album => ({
+      cells: [album.key || "Unknown album", groupArtistLabel(album), album.tracks.length.toLocaleString()],
+      album: album.key
+    }))
+    : [...selected.tracks].sort((a, b) => byName(a.album || "", b.album || "") || (a.trackNumber ?? Infinity) - (b.trackNumber ?? Infinity) || byName(a.title, b.title)).map(track => ({
+      cells: [Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? String(track.trackNumber) : "—", track.title, track.artist || "Unknown artist", track.album || "Unknown album", formatDuration(track.duration)],
+      album: track.album || null
+    }));
+  if (!rows.length) return hint(`No ${albumsMetric ? "albums" : "tracks"} for ${selected.year}.`);
+
+  const table = document.createElement("table");
+  table.className = "w-full min-w-[480px] table-fixed border-collapse text-base";
+  const colgroup = document.createElement("colgroup");
+  const headRow = document.createElement("tr");
+  headRow.className = "border-b border-[#e1e9e7]";
+  for (const column of columns) {
+    const col = document.createElement("col");
+    col.className = column.width;
+    colgroup.append(col);
+    const heading = document.createElement("th");
+    heading.scope = "col";
+    heading.className = `px-3 py-2.5 ${column.end ? "text-right" : "text-left"}`;
+    heading.textContent = column.label;
+    headRow.append(heading);
+  }
+  const thead = document.createElement("thead");
+  thead.className = "sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]";
+  thead.append(headRow);
+  const tbody = document.createElement("tbody");
+  const nameColumn = albumsMetric ? 0 : 1;
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.className = `border-b border-[#e7ecec] last:border-b-0 ${row.album === null ? "" : "cursor-pointer hover:bg-[#f7faf9]"}`;
+    if (row.album !== null) tr.addEventListener("click", event => {
+      if (!event.target.closest("button")) openAlbum(row.album);
+    });
+    row.cells.forEach((value, index) => {
+      const cell = trackCell(value, `${columns[index].end ? "text-right tabular-nums" : ""} ${index === nameColumn ? "font-medium text-[#263940]" : "text-[#5d7079]"}`);
+      if (index === nameColumn && row.album !== null) {
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "block max-w-full truncate text-left";
+        open.textContent = value;
+        open.addEventListener("click", () => openAlbum(row.album));
+        cell.replaceChildren(open);
+      }
+      tr.append(cell);
+    });
+    tbody.append(tr);
+  }
+  table.append(colgroup, thead, tbody);
+  detail.append(table);
+}
+
 function render() {
   syncHash();
   hideContextMenu();
-  for (const view of ["library", "playlists"]) {
+  for (const view of ["library", "playlists", "analysis"]) {
     const active = currentView === view;
     const nav = elements[`nav-${view}`];
     const panel = elements[`${view}-view`];
@@ -266,11 +425,12 @@ function render() {
     nav.classList.toggle("text-[#284f48]", active);
     nav.classList.toggle("font-medium", !active);
     nav.classList.toggle("text-[#273b44]", !active);
-    if (active && view === "playlists" && !selectedPlaylistId) nav.setAttribute("aria-current", "page");
+    if (active && (view === "analysis" || (view === "playlists" && !selectedPlaylistId))) nav.setAttribute("aria-current", "page");
     else nav.removeAttribute("aria-current");
     panel.classList.toggle("hidden", !active);
     panel.classList.toggle("flex", active);
   }
+  if (currentView === "analysis") renderAnalysis();
   for (const mode of ["artist", "album", "track"]) {
     const nav = elements[`nav-${mode}`];
     const active = currentView === "library" && libraryMode === mode;
@@ -1019,6 +1179,13 @@ for (const mode of ["artist", "album", "track"]) {
   elements[`nav-${mode}`].addEventListener("click", () => browseLibrary(mode));
 }
 elements["nav-playlists"].addEventListener("click", () => { currentView = "playlists"; selectedPlaylistId = null; render(); });
+elements["nav-analysis"].addEventListener("click", () => { currentView = "analysis"; render(); });
+for (const metric of ["albums", "tracks"]) {
+  elements[`analysis-${metric}`].addEventListener("click", () => {
+    analysisMetric = metric;
+    render();
+  });
+}
 elements["save-playlist"].addEventListener("click", () => {
   elements["generate-form"].classList.add("hidden");
   elements["save-form"].classList.remove("hidden");
@@ -1164,6 +1331,10 @@ let historyReady = false;
 
 function routeHash() {
   const encode = value => encodeURIComponent(value);
+  if (currentView === "analysis") {
+    if (analysisYear !== null) return `#/analysis/${analysisMetric}/${analysisYear}`;
+    return analysisMetric === "albums" ? "#/analysis" : `#/analysis/${analysisMetric}`;
+  }
   if (currentView === "playlists") return selectedPlaylistId ? `#/playlists/${encode(selectedPlaylistId)}` : "#/playlists";
   const segments = [`${libraryMode}s`];
   if (libraryMode !== "track" && libraryGroup !== null) {
@@ -1191,6 +1362,12 @@ function applyRoute() {
     parts = [];
   }
   const [name, group, album] = parts;
+  if (name === "analysis") {
+    currentView = "analysis";
+    analysisMetric = group === "tracks" ? "tracks" : "albums";
+    analysisYear = Number.isSafeInteger(Number(album)) && album ? Number(album) : null;
+    return;
+  }
   if (name === "playlists") {
     currentView = "playlists";
     selectedPlaylistId = group || null;
@@ -1204,6 +1381,7 @@ function applyRoute() {
 
 function validateRoute() {
   if (!library) return;
+  if (analysisYear !== null && !buildYearTimeline(library.tracks).years.some(item => item.year === analysisYear)) analysisYear = null;
   if (libraryMode !== "track" && libraryGroup !== null && !library.tracks.some(track => groupKey(track, libraryMode) === libraryGroup)) {
     libraryGroup = null;
     artistAlbum = null;
