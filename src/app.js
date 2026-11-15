@@ -78,7 +78,9 @@ function renderPlayback() {
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
   elements["now-playing"].textContent = player.path ? track?.title || player.path : "Nothing playing";
-  elements["now-artist"].textContent = track ? track.artist || "Unknown artist" : "";
+  const details = track ? [track.artist || "Unknown artist", `${track.album || "Unknown album"}${Number.isFinite(track.year) ? ` (${track.year})` : ""}`].join(" · ") : "";
+  elements["now-artist"].textContent = details;
+  elements["now-artist"].title = details;
   const playing = player.path && !player.audio.paused;
   const playLabel = playing ? "Pause" : "Play";
   elements["play-pause"].setAttribute("aria-label", playLabel);
