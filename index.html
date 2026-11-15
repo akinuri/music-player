@@ -14,6 +14,8 @@
       <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM14 5h4v14h-4z" fill="currentColor"/></symbol>
       <symbol id="icon-previous" viewBox="0 0 24 24"><path d="M6 5v14M19 5 9 12l10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-muted" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="icon-added" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-remove" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
@@ -124,6 +126,11 @@
               <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-11 flex-1 items-center justify-center rounded-md border border-[#cbd6d9] hover:bg-[#eff4f4] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
               <button id="play-pause" type="button" aria-label="Play" title="Play" disabled class="flex h-11 flex-1 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-play"></use></svg></button>
               <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-11 flex-1 items-center justify-center rounded-md border border-[#cbd6d9] hover:bg-[#eff4f4] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
+            </div>
+            <div class="mt-4 flex items-center gap-2">
+              <button id="mute" type="button" aria-label="Mute" title="Mute" class="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-white text-[#28454a] hover:bg-[#e7f0ed]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-volume"></use></svg></button>
+              <label for="volume" class="sr-only">Volume</label><input id="volume" type="range" min="0" max="100" step="1" value="100" class="min-w-0 flex-1 accent-[#315e55]">
+              <span id="volume-value" class="w-10 text-right text-base tabular-nums text-[#5d7079]">100%</span>
             </div>
           </section>
 
