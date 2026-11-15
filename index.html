@@ -118,13 +118,13 @@
         <div class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[380px] xl:w-[480px] 2xl:w-[560px] lg:shrink-0 lg:overflow-y-auto">
           <section class="shrink-0 rounded-xl border border-[#d6e0df] bg-white p-5 shadow-sm" aria-label="Playback controls">
             <div class="min-w-0">
-              <p id="now-playing" class="truncate text-base font-semibold text-[#263940]">Nothing playing</p>
-              <p id="now-artist" class="mt-1 truncate text-base text-[#5d7079]"></p>
+              <p id="now-playing" class="h-6 truncate text-base font-semibold text-[#263940]">Nothing playing</p>
+              <p id="now-artist" class="mt-1 h-6 truncate text-base text-[#5d7079]"></p>
             </div>
             <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-[#5d7079]">
-              <span id="elapsed">0:00</span>
+              <span id="elapsed" class="w-10 shrink-0">0:00</span>
               <label for="seek" class="sr-only">Playback position</label><input id="seek" type="range" min="0" max="0" value="0" step="0.1" disabled class="min-w-0 flex-1 accent-[#315e55]">
-              <span id="playback-duration">—</span>
+              <span id="playback-duration" class="w-10 shrink-0 text-right">—</span>
             </div>
             <div class="mt-4 flex items-center gap-2">
               <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
