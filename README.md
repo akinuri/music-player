@@ -1,29 +1,33 @@
 # Local music library
 
-A local, browser-based music library and player. Choose a folder to recursively index its MP3 files, then search, sort, or rescan the collection. Files stay in their original locations; folder handles, the index, and playlists are stored in IndexedDB on this browser and device. Nothing is uploaded.
+A static, client-side player for your local MP3 collection. Pick a folder and it indexes the files in place. Nothing is uploaded; the index, playlists and settings live in this browser's IndexedDB and localStorage.
+
+Requires a Chromium-based browser (File System Access API) over HTTPS or localhost.
+
+## Features
+
+- **Library:** browse by artist, album or track; search, sort any column, add to the playlist or play from anywhere.
+- **Playlists:** save, rename, reorder by drag and drop, remove tracks, shuffle in tracks by minutes, import/export as JSON. The loaded playlist is remembered and its name pre-filled on save.
+- **Playback:** resumes where you left off after a reload; volume remembered.
+- **Analysis:** timeline of your library by release year, measured in albums or tracks.
+- **Visualizer:** live spectrum of the playing track.
+- **Folders:** choose a folder or drag one onto the folder button. Rescan after adding or removing files.
+- **Deep links:** the current view is kept in the address, so reloads and the back button work.
+
+## Notes
+
+- Tags (title, artist, album, track number, year) come from the MP3 files. Rescan older libraries to pick up track numbers and years.
+- After a browser restart the library stays visible, but folder access may need **Reconnect** before playing or rescanning.
+- Playlists are tied to the folder they were saved from. Clearing site data removes everything.
 
 ## Run
-
-Use Node.js and npm to build the static site:
 
 ```sh
 npm install
 npm run build
 ```
 
-Serve the project root using any static HTTP server, for example `npx serve .`, and open its localhost address in a current Chromium-based browser. Deploy `index.html` and the generated `dist` directory together to a static host over HTTPS. Folder access requires HTTPS or localhost and a browser supporting the File System Access API.
-
-Folder controls are below the navigation. When opening the site again, the saved index and playlists remain visible even if folder permission has expired. Use **Reconnect** to grant access again, or **Change folder** if the saved handle is no longer available. **Rescan** discovers added and removed MP3 files; a failed scan leaves the previous index intact. Playlist entries for removed files remain visible until removed. Choosing a different folder clears the current playlist but keeps saved playlists. Clearing browser site data removes the index, playlists, and saved folder permission.
-
-Title, artist, album, track number, and year come from MP3 tags, with the filename, “Unknown artist,” “Unknown album,” and a dash used when tags are missing. Rescan an existing library to index track numbers and years. An album’s year is the earliest year among its tracks. Duration is read by the browser. Files with unreadable metadata are still indexed; the dismissible scan result lists their paths and whether metadata or duration could not be read. Missing durations are excluded from the total (indicated by `+`). A scan can take time for large collections.
-
-Use **Artists**, **Albums**, and **Tracks** under Library to browse the center view. Navigation counts include unknown artist and album groups, and each saved playlist shows its track count. Select an artist to browse their albums, then select an album to see its tracks. The Albums view shows albums across the whole library. Artist and album tables show track counts and total duration; artists also show album counts. Counts, durations, and group actions reflect the current search results. Click a column heading to sort, and click it again to reverse the order. Use **+** to add tracks or all matching tracks in a group to the current playlist without duplicates. **Play** adds any missing tracks and starts the first track in the selection. Action buttons have hover labels and accessible names. Playback controls are above the playlist, and playback advances through the playlist automatically. Double-click an item in the current playlist (or focus it and press Enter) to play it. Right-click an item for a menu with **Remove from playlist**, or focus it and press Delete.
-
-Use the save icon on the current playlist to name and save a snapshot. Saving an existing name asks before replacing it. Select a saved playlist under **Playlists** to view its tracks in the center, or open **Playlists** for the full list. Viewing a snapshot does not change the current playlist; use its load icon to do that. Deleting a saved playlist does not change the current playlist. Use the pencil icon on a saved playlist, in the list or in its header, to rename it; names must stay unique. To load one, select the same music folder it was saved from. Changes to the current playlist do not automatically update a saved snapshot; save under the same name to replace it. The app remembers which saved playlist you loaded (or last saved), even after a reload, and pre-fills its name when you save, until the current playlist is cleared or that playlist is deleted. Use the shuffle icon on the current playlist to generate random tracks by duration: enter minutes and the tracks are added after the current ones, skipping any already in the playlist. Clear the playlist first to start fresh. Tracks are picked at random without exceeding the requested time, and tracks with an unknown duration are never picked. On **Playlists**, use the export icons to download one playlist or all of them as a JSON file, and the import icon to add playlists from such files. Imported playlists are tied to the currently connected music folder, so import after choosing the folder their file paths belong to. Names that already exist get a number suffix instead of being replaced.
-
-**Analysis** shows a timeline of release years. Each column is a year (empty years in between included), and the switch at the top measures albums or tracks. An album counts toward the earliest year found among its tracks. Select a year to list its albums or tracks, and select an album to open it in the library. The selected year is kept in the address, so a reload keeps it. Tracks without a year are counted separately. Rescan older libraries to read years.
-
-**Visualizer** draws a live frequency-bar display of the playing track. It starts after you open the page and interact with it, because browsers only allow audio analysis after a user gesture; until then playback is untouched.
+Serve the project root with any static server (for example `npx serve .`). To publish, deploy `index.html` and `dist/` together.
 
 ## Test
 
