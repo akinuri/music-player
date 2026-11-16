@@ -731,7 +731,7 @@ function render() {
     const trackCount = saved.tracks.length;
     const artists = [...new Set(saved.tracks.map(track => track.artist).filter(Boolean))];
     const artistSummary = artists.length > 3 ? `${artists.slice(0, 3).join(", ")} +${artists.length - 3}` : artists.join(", ");
-    const row = itemRow(index, saved.name, [`${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, artistSummary].filter(Boolean).join(" · "), formatTotal(saved.tracks), "cursor-pointer hover:bg-[#f7faf9] sm:px-6");
+    const row = itemRow(index, saved.name, [`${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, artistSummary].filter(Boolean).join(" · "), formatTotal(saved.tracks),     "cursor-pointer sm:px-6");
     const nameButton = document.createElement("button");
     nameButton.type = "button";
     nameButton.className = row.querySelector("[data-title]").className;
@@ -788,7 +788,7 @@ function render() {
 // One playlist line: index, "title · subtitle" and a right-aligned time.
 function itemRow(index, titleText, metaText, timeText, extraClass = "") {
   const row = document.createElement("div");
-  row.className = `flex items-center gap-3 border-b border-[#e7ecec] px-4 py-2 text-sm last:border-b-0 ${extraClass}`;
+  row.className = `flex items-center gap-3 border-b border-[#e7ecec] px-4 py-2 text-sm last:border-b-0 hover:bg-[#f1f6f4] ${extraClass}`;
   const number = document.createElement("span");
   number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
   number.textContent = String(index + 1);
