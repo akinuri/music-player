@@ -739,9 +739,7 @@ function render() {
     });
   } else [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })).forEach((saved, index) => {
     const trackCount = saved.tracks.length;
-    const artists = [...new Set(saved.tracks.map(track => track.artist).filter(Boolean))];
-    const artistSummary = artists.length > 3 ? `${artists.slice(0, 3).join(", ")} +${artists.length - 3}` : artists.join(", ");
-    const row = itemRow(index, saved.name, [`${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, artistSummary].filter(Boolean).join(" · "), formatTotal(saved.tracks),     "cursor-pointer sm:px-6");
+    const row = itemRow(index, saved.name, `${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, formatTotal(saved.tracks), "cursor-pointer sm:px-6");
     const nameButton = document.createElement("button");
     nameButton.type = "button";
     nameButton.className = row.querySelector("[data-title]").className;
