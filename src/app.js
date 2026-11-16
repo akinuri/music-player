@@ -716,50 +716,41 @@ function render() {
     );
     selected.tracks.forEach((track, index) => {
       const currentTrack = selectedPlaylistMatchesLibrary ? trackFor(track.path) : null;
-      const trackTitle = track.title || currentTrack?.title;
-      const album = track.album || currentTrack?.album ? albumText({ album: track.album || currentTrack?.album, year: track.year ?? currentTrack?.year }) : "";
-      const row = document.createElement("div");
-      row.className = "flex items-start gap-3 border-b border-[#e7ecec] px-4 py-3 last:border-b-0 sm:px-6";
-      const number = document.createElement("span");
-      number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
-      number.textContent = String(index + 1);
-      const details = document.createElement("div");
-      details.className = "min-w-0 flex-1";
-      const title = document.createElement("p");
-      title.className = "break-words font-medium text-[#263940]";
-      setTitle(title, trackTitle || track.path, track.trackNumber ?? currentTrack?.trackNumber);
-      const meta = document.createElement("p");
-      meta.className = "mt-1.5 break-words text-[#5d7079]";
-      meta.textContent = [track.artist || currentTrack?.artist, album, formatDuration(track.duration)].filter(Boolean).join(" · ");
-      details.append(title, meta);
-      row.append(number, details);
+      const albumName = track.album || currentTrack?.album;
+      const row = itemRow(
+        index,
+        track.title || currentTrack?.title || track.path,
+        [track.artist || currentTrack?.artist || "Unknown artist", albumName ? albumText({ album: albumName, year: track.year ?? currentTrack?.year }) : ""].filter(Boolean).join(" · "),
+        formatDuration(track.duration),
+        "sm:px-6"
+      );
+      setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || track.path, track.trackNumber ?? currentTrack?.trackNumber);
       elements["saved-playlists"].append(row);
     });
-  } else for (const saved of [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }))) {
-    const row = document.createElement("div");
-    row.className = "flex items-center gap-3 border-b border-[#e7ecec] px-4 py-4 last:border-b-0 sm:px-6";
-    const details = document.createElement("button");
-    details.type = "button";
-    details.className = "min-w-0 flex-1 rounded text-left hover:bg-[#f7faf9]";
-    details.addEventListener("click", () => selectPlaylist(saved));
-    const title = document.createElement("span");
-    title.className = "block break-words text-base font-semibold text-[#263940]";
-    title.textContent = saved.name;
-    const meta = document.createElement("span");
-    meta.className = "mt-1 block break-words text-base text-[#5d7079]";
+  } else [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })).forEach((saved, index) => {
     const trackCount = saved.tracks.length;
-    meta.textContent = `${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"} · ${formatTotal(saved.tracks)}`;
-    details.append(title, meta);
+    const artists = [...new Set(saved.tracks.map(track => track.artist).filter(Boolean))];
+    const artistSummary = artists.length > 3 ? `${artists.slice(0, 3).join(", ")} +${artists.length - 3}` : artists.join(", ");
+    const row = itemRow(index, saved.name, [`${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, artistSummary].filter(Boolean).join(" · "), formatTotal(saved.tracks), "cursor-pointer hover:bg-[#f7faf9] sm:px-6");
+    const nameButton = document.createElement("button");
+    nameButton.type = "button";
+    nameButton.className = row.querySelector("[data-title]").className;
+    nameButton.textContent = saved.name;
+    nameButton.addEventListener("click", () => selectPlaylist(saved));
+    row.querySelector("[data-title]").replaceWith(nameButton);
+    row.addEventListener("click", event => {
+      if (!event.target.closest("button")) selectPlaylist(saved);
+    });
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-2";
     actions.append(
-      button("rename", `Rename playlist: ${saved.name}`, () => openRename(saved), busy),
-      button("load", `Load playlist: ${saved.name}`, () => loadPlaylist(saved), busy),
-      button("clear", `Delete playlist: ${saved.name}`, () => removeSavedPlaylist(saved), busy)
+      button("rename", `Rename playlist: ${saved.name}`, () => openRename(saved), busy, true),
+      button("load", `Load playlist: ${saved.name}`, () => loadPlaylist(saved), busy, true),
+      button("clear", `Delete playlist: ${saved.name}`, () => removeSavedPlaylist(saved), busy, true)
     );
-    row.append(details, actions);
+    row.append(actions);
     elements["saved-playlists"].append(row);
-  }
+  });
   elements["playlist-duration"].textContent = formatTotal(paths.map(path => trackFor(path) || { duration: null }));
   elements["playlist-empty"].classList.toggle("hidden", paths.length > 0);
   elements["clear-playlist"].disabled = busy || !paths.length;
@@ -771,8 +762,7 @@ function render() {
   elements.playlist.replaceChildren();
   paths.forEach((path, index) => {
     const track = trackFor(path);
-    const row = document.createElement("div");
-    row.className = "flex select-none items-center gap-3 border-b border-[#e7ecec] px-4 py-2 text-sm last:border-b-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#315e55]";
+    const row = itemRow(index, track?.title || path, track ? track.artist || "Unknown artist" : "Not found in library", track ? formatDuration(track.duration) : "", "select-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#315e55]");
     row.dataset.path = path;
     row.tabIndex = 0;
     row.addEventListener("dblclick", event => {
@@ -786,26 +776,6 @@ function render() {
         updatePlaylist(paths.filter((_, i) => i !== index)).then(() => next && elements.playlist.querySelector(`[data-path="${CSS.escape(next.dataset.path)}"]`)?.focus());
       }
     });
-    const number = document.createElement("span");
-    number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
-    number.textContent = String(index + 1);
-    const details = document.createElement("div");
-    details.className = "flex min-w-0 flex-1 items-baseline gap-2";
-    const title = document.createElement("span");
-    title.className = "max-w-[55%] shrink-0 truncate font-semibold text-[#263940]";
-    setTitle(title, track?.title || path);
-    const dot = document.createElement("span");
-    dot.className = "shrink-0 text-[#a3b0b4]";
-    dot.setAttribute("aria-hidden", "true");
-    dot.textContent = "·";
-    const meta = document.createElement("span");
-    meta.className = "min-w-0 flex-1 truncate text-[#5d7079]";
-    meta.textContent = track ? track.artist || "Unknown artist" : "Not found in library";
-    details.append(title, dot, meta);
-    const time = document.createElement("span");
-    time.className = "shrink-0 tabular-nums text-[#5d7079]";
-    time.textContent = track ? formatDuration(track.duration) : "";
-    row.append(number, details, time);
     row.addEventListener("contextmenu", event => {
       event.preventDefault();
       openContextMenu(row, index, event);
@@ -813,6 +783,34 @@ function render() {
     elements.playlist.append(row);
   });
   renderPlayback();
+}
+
+// One playlist line: index, "title · subtitle" and a right-aligned time.
+function itemRow(index, titleText, metaText, timeText, extraClass = "") {
+  const row = document.createElement("div");
+  row.className = `flex items-center gap-3 border-b border-[#e7ecec] px-4 py-2 text-sm last:border-b-0 ${extraClass}`;
+  const number = document.createElement("span");
+  number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
+  number.textContent = String(index + 1);
+  const details = document.createElement("div");
+  details.className = "flex min-w-0 flex-1 items-baseline gap-2";
+  const title = document.createElement("span");
+  title.dataset.title = "";
+  title.className = "max-w-[55%] shrink-0 truncate font-semibold text-[#263940]";
+  title.textContent = titleText;
+  const dot = document.createElement("span");
+  dot.className = "shrink-0 text-[#a3b0b4]";
+  dot.setAttribute("aria-hidden", "true");
+  dot.textContent = "·";
+  const meta = document.createElement("span");
+  meta.className = "min-w-0 flex-1 truncate text-[#5d7079]";
+  meta.textContent = metaText;
+  details.append(title, dot, meta);
+  const time = document.createElement("span");
+  time.className = "shrink-0 tabular-nums text-[#5d7079]";
+  time.textContent = timeText;
+  row.append(number, details, time);
+  return row;
 }
 
 let contextRow = null;
