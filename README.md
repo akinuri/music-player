@@ -23,6 +23,8 @@ Use the save icon on the current playlist to name and save a snapshot. Saving an
 
 **Analysis** shows a timeline of release years. Each column is a year (empty years in between included), and the switch at the top measures albums or tracks. An album counts toward the earliest year found among its tracks. Select a year to list its albums or tracks, and select an album to open it in the library. The selected year is kept in the address, so a reload keeps it. Tracks without a year are counted separately. Rescan older libraries to read years.
 
+**Visualizer** draws a live frequency-bar display of the playing track. It starts after you open the page and interact with it, because browsers only allow audio analysis after a user gesture; until then playback is untouched.
+
 ## Test
 
 ```sh

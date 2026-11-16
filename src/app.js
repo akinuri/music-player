@@ -3,11 +3,12 @@ import { readMetadata } from "./metadata.js";
 import { loadLibrary, saveLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
+import { Visualizer } from "./visualizer.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, parsePlaylists, PlaylistFileError, playlistMatchesLibrary, serializePlaylists } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -37,6 +38,7 @@ const player = new Playback({
     notice("Couldn't play this file. It may be missing, unreadable, or unsupported.", true);
   }
 });
+const visualizer = new Visualizer(player.audio, $("visualizer-canvas"));
 
 const NOTICE_DURATION = 5000;
 const ERROR_NOTICE_DURATION = NOTICE_DURATION * 10;
@@ -199,6 +201,7 @@ function renderPlayback() {
   setPageTitle(track ? `${track.title || player.path} · ${track.artist || "Unknown artist"}` : "Music player", !!track && !player.audio.paused);
   elements["now-artist"].textContent = details;
   elements["now-artist"].title = details;
+  elements["visualizer-empty"].classList.toggle("hidden", !!player.path || !!player.pendingPath);
   const playing = player.path && !player.audio.paused;
   const playLabel = playing ? "Pause" : "Play";
   elements["play-pause"].setAttribute("aria-label", playLabel);
@@ -450,7 +453,7 @@ function renderAnalysis() {
 function render() {
   syncHash();
   hideContextMenu();
-  for (const view of ["library", "playlists", "analysis"]) {
+  for (const view of ["library", "playlists", "analysis", "visualizer"]) {
     const active = currentView === view;
     const nav = elements[`nav-${view}`];
     const panel = elements[`${view}-view`];
@@ -459,12 +462,14 @@ function render() {
     nav.classList.toggle("text-[#284f48]", active);
     nav.classList.toggle("font-medium", !active);
     nav.classList.toggle("text-[#273b44]", !active);
-    if (active && (view === "analysis" || (view === "playlists" && !selectedPlaylistId))) nav.setAttribute("aria-current", "page");
+    if (active && (view === "analysis" || view === "visualizer" || (view === "playlists" && !selectedPlaylistId))) nav.setAttribute("aria-current", "page");
     else nav.removeAttribute("aria-current");
     panel.classList.toggle("hidden", !active);
     panel.classList.toggle("flex", active);
   }
   if (currentView === "analysis") renderAnalysis();
+  if (currentView === "visualizer") visualizer.start();
+  else visualizer.stop();
   for (const mode of ["artist", "album", "track"]) {
     const nav = elements[`nav-${mode}`];
     const active = currentView === "library" && libraryMode === mode;
@@ -1414,6 +1419,8 @@ for (const mode of ["artist", "album", "track"]) {
 }
 elements["nav-playlists"].addEventListener("click", () => { currentView = "playlists"; selectedPlaylistId = null; render(); });
 elements["nav-analysis"].addEventListener("click", () => { currentView = "analysis"; render(); });
+elements["nav-visualizer"].addEventListener("click", () => { currentView = "visualizer"; render(); });
+for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => { if (currentView === "visualizer") visualizer.connect(); });
 for (const metric of ["albums", "tracks"]) {
   elements[`analysis-${metric}`].addEventListener("click", () => {
     analysisMetric = metric;
@@ -1592,6 +1599,7 @@ let historyReady = false;
 
 function routeHash() {
   const encode = value => encodeURIComponent(value);
+  if (currentView === "visualizer") return "#/visualizer";
   if (currentView === "analysis") {
     if (analysisYear !== null) return `#/analysis/${analysisMetric}/${analysisYear}`;
     return analysisMetric === "albums" ? "#/analysis" : `#/analysis/${analysisMetric}`;
@@ -1623,6 +1631,10 @@ function applyRoute() {
     parts = [];
   }
   const [name, group, album] = parts;
+  if (name === "visualizer") {
+    currentView = "visualizer";
+    return;
+  }
   if (name === "analysis") {
     currentView = "analysis";
     analysisMetric = group === "tracks" ? "tracks" : "albums";
