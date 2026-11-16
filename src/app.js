@@ -7,7 +7,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -22,6 +22,7 @@ let currentAlbumView = null;
 let sortBeforeAlbum = null;
 const groupSort = { artist: { key: "name", direction: "ascending" }, album: { key: "name", direction: "ascending" } };
 let selectedPlaylistId = null;
+let renamingId = null;
 let analysisMetric = "albums";
 let analysisYear = null;
 const analysisSort = { albums: { column: 0, direction: "ascending" }, tracks: { column: null, direction: "ascending" } };
@@ -226,7 +227,8 @@ const buttonTitles = {
   load: "Load playlist",
   clear: "Delete playlist",
   export: "Export playlist",
-  import: "Import playlists"
+  import: "Import playlists",
+  rename: "Rename playlist"
 };
 
 function button(icon, label, action, disabled = false, compact = false) {
@@ -676,6 +678,10 @@ function render() {
   elements["playlist-count"].textContent = `${paths.length.toLocaleString()} ${paths.length === 1 ? "Track" : "Tracks"}`;
   elements["playlist-nav-count"].textContent = savedPlaylists.length.toLocaleString();
   const selected = savedPlaylists.find(saved => saved.id === selectedPlaylistId);
+  if (renamingId !== null && (currentView !== "playlists" || renamingId !== selectedPlaylistId)) renamingId = null;
+  elements["rename-form"].classList.toggle("hidden", !selected || renamingId !== selected.id);
+  elements["rename-input"].disabled = busy;
+  elements["rename-submit"].disabled = busy;
   const showPlaylists = () => {
     selectedPlaylistId = null;
     render();
@@ -703,6 +709,7 @@ function render() {
   }
   if (selected) {
     elements["saved-actions"].append(
+      button("rename", `Rename playlist: ${selected.name}`, () => openRename(selected), busy),
       button("export", `Export playlist: ${selected.name}`, () => exportPlaylists([selected], selected.name), busy),
       button("load", `Load playlist: ${selected.name}`, () => loadPlaylist(selected), busy),
       button("clear", `Delete playlist: ${selected.name}`, () => removeSavedPlaylist(selected), busy)
@@ -746,6 +753,7 @@ function render() {
     const actions = document.createElement("div");
     actions.className = "flex shrink-0 gap-2";
     actions.append(
+      button("rename", `Rename playlist: ${saved.name}`, () => openRename(saved), busy),
       button("load", `Load playlist: ${saved.name}`, () => loadPlaylist(saved), busy),
       button("clear", `Delete playlist: ${saved.name}`, () => removeSavedPlaylist(saved), busy)
     );
@@ -855,6 +863,52 @@ function selectPlaylist(saved) {
   selectedPlaylistMatchesLibrary = false;
   render();
   refreshSelectedPlaylistMatch();
+}
+
+function openRename(saved) {
+  selectPlaylist(saved);
+  renamingId = saved.id;
+  elements["rename-input"].value = saved.name;
+  render();
+  elements["rename-input"].focus();
+  elements["rename-input"].setSelectionRange(saved.name.length, saved.name.length);
+}
+
+function closeRename() {
+  renamingId = null;
+  render();
+}
+
+async function renameSavedPlaylist() {
+  const saved = savedPlaylists.find(item => item.id === renamingId);
+  if (busy || !saved) return;
+  const name = elements["rename-input"].value.trim();
+  if (!name) {
+    notice("Enter a playlist name.", true);
+    elements["rename-input"].focus();
+    return;
+  }
+  if (name === saved.name) return closeRename();
+  if (savedPlaylists.some(item => item.id !== saved.id && item.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+    notice(`A saved playlist named "${name}" already exists.`, true);
+    elements["rename-input"].focus();
+    return;
+  }
+  busy = true;
+  render();
+  try {
+    const renamed = { ...saved, name };
+    await saveSavedPlaylist(renamed);
+    savedPlaylists = savedPlaylists.map(item => item.id === saved.id ? renamed : item);
+    renamingId = null;
+    notice(`Renamed playlist to "${name}".`);
+  } catch (error) {
+    console.error("Could not rename playlist:", error);
+    notice("Couldn't rename the playlist. Its name was not changed.", true);
+  } finally {
+    busy = false;
+    render();
+  }
 }
 
 async function generatePlaylist() {
@@ -1268,6 +1322,14 @@ elements.playlist.addEventListener("contextmenu", event => {
   if (!event.target.closest("[data-path]")) event.preventDefault();
 });
 elements["clear-playlist"].addEventListener("click", () => updatePlaylist([]));
+elements["rename-form"].addEventListener("submit", event => {
+  event.preventDefault();
+  renameSavedPlaylist();
+});
+elements["rename-cancel"].addEventListener("click", closeRename);
+elements["rename-input"].addEventListener("keydown", event => {
+  if (event.key === "Escape") closeRename();
+});
 elements["import-file"].addEventListener("change", () => {
   const files = [...elements["import-file"].files];
   elements["import-file"].value = "";

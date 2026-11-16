@@ -21,6 +21,7 @@
       <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="M4 6h3c5 0 5 12 10 12h3M4 18h3c2 0 3-1.5 4-3M13 9c1-1.5 2-3 4-3h3M17 3l3 3-3 3M17 15l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-export" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-import" viewBox="0 0 24 24"><path d="M12 4v11M8 11l4 4 4-4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-rename" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-remove" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="icon-clear" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 19V5h7l2 2h9v12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -113,6 +114,14 @@
             <div id="saved-actions" class="ml-auto flex shrink-0 gap-1"></div>
             <input id="import-file" type="file" accept=".json,application/json" multiple class="hidden">
           </div>
+          <form id="rename-form" class="hidden border-b border-[#e1e9e7] px-4 py-3 sm:px-6">
+            <label for="rename-input" class="sr-only">Playlist name</label>
+            <div class="flex gap-2">
+              <input id="rename-input" type="text" required maxlength="120" class="min-w-0 flex-1 rounded-md border border-[#cbd6d9] px-3 py-2 text-base outline-none focus:border-[#315e55]">
+              <button id="rename-submit" type="submit" aria-label="Save new name" title="Rename" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
+              <button id="rename-cancel" type="button" aria-label="Cancel renaming" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
+            </div>
+          </form>
           <div class="max-h-80 overflow-y-auto lg:max-h-none lg:flex-1">
             <div id="saved-playlists"></div>
             <p id="saved-empty" class="px-5 py-12 text-center text-base text-[#5d7079]">Save the current playlist or import one to see it here.</p>
