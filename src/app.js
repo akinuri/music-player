@@ -617,7 +617,7 @@ function render() {
       nameButton.title = name;
       nameButton.addEventListener("click", open);
       nameCell.append(nameButton);
-      row.append(trackCell(String(position + 1), "tabular-nums text-[#5d7079]"), nameCell);
+      row.append(trackCell(String(position + 1), "tabular-nums text-[#a3b0b4]"), nameCell);
       if (albumsPage) {
         const artistLabel = groupArtistLabel(group);
         row.append(trackCell(artistLabel, "text-[#5d7079]"));
@@ -645,7 +645,7 @@ function render() {
       row.append(actionCell);
       elements["group-rows"].append(row);
     }
-  } else filtered.forEach(track => {
+  } else filtered.forEach((track, position) => {
     const row = document.createElement("tr");
     row.className = "border-b border-[#e7ecec] hover:bg-[#f7faf9] last:border-b-0";
     const added = playlistPaths().includes(track.path);
@@ -661,6 +661,7 @@ function render() {
     actionCell.className = "px-3 py-1";
     actionCell.append(actions);
     row.append(
+      trackCell(String(position + 1), "tabular-nums text-[#a3b0b4]"),
       trackCell(Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? String(track.trackNumber) : "—", "tabular-nums text-[#5d7079]"),
       trackCell(track.title, "font-medium text-[#263940]"),
       ...(hideTrackArtist ? [] : [trackCell(track.artist || "Unknown artist", "text-[#5d7079]")]),
