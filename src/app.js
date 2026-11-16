@@ -726,6 +726,15 @@ function render() {
       );
       setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || track.path, track.trackNumber ?? currentTrack?.trackNumber);
       row.addEventListener("dblclick", () => playSavedTrack(selected, track.path));
+      row.tabIndex = 0;
+      row.classList.add("focus-visible:outline", "focus-visible:outline-2", "focus-visible:-outline-offset-2", "focus-visible:outline-[#315e55]");
+      row.addEventListener("keydown", event => {
+        if (event.target === row && event.key === "Delete" && !busy) removeSavedTrack(selected, index);
+      });
+      row.addEventListener("contextmenu", event => {
+        event.preventDefault();
+        openContextMenu(row, () => removeSavedTrack(selected, index), event);
+      });
       elements["saved-playlists"].append(row);
     });
   } else [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })).forEach((saved, index) => {
@@ -779,7 +788,7 @@ function render() {
     });
     row.addEventListener("contextmenu", event => {
       event.preventDefault();
-      openContextMenu(row, index, event);
+      openContextMenu(row, () => updatePlaylist(paths.filter((_, i) => i !== index)), event);
     });
     elements.playlist.append(row);
   });
@@ -815,17 +824,19 @@ function itemRow(index, titleText, metaText, timeText, extraClass = "") {
 }
 
 let contextRow = null;
+let contextRemove = null;
 
 function hideContextMenu() {
   elements["context-menu"].classList.add("hidden");
   contextRow?.classList.remove("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
   contextRow = null;
+  contextRemove = null;
 }
 
-function openContextMenu(row, index, event) {
+function openContextMenu(row, onRemove, event) {
   hideContextMenu();
   contextRow = row;
-  contextRow.dataset.menuIndex = String(index);
+  contextRemove = onRemove;
   row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
   const menu = elements["context-menu"];
   menu.classList.remove("hidden");
@@ -1037,6 +1048,23 @@ async function loadPlaylist(saved) {
     return true;
   }
   return false;
+}
+
+async function removeSavedTrack(saved, index) {
+  if (busy) return;
+  busy = true;
+  render();
+  try {
+    const updated = { ...saved, tracks: saved.tracks.filter((_, i) => i !== index) };
+    await saveSavedPlaylist(updated);
+    savedPlaylists = savedPlaylists.map(item => item.id === saved.id ? updated : item);
+  } catch (error) {
+    console.error("Could not update playlist:", error);
+    notice("Couldn't remove the track. The playlist was not changed.", true);
+  } finally {
+    busy = false;
+    render();
+  }
 }
 
 async function playSavedTrack(saved, path) {
@@ -1319,10 +1347,10 @@ elements["generate-form"].addEventListener("submit", event => {
   generatePlaylist();
 });
 elements["context-remove"].addEventListener("click", () => {
-  const index = Number(contextRow?.dataset.menuIndex);
   const row = contextRow;
+  const remove = contextRemove;
   hideContextMenu();
-  if (Number.isInteger(index)) updatePlaylist(playlistPaths().filter((_, i) => i !== index));
+  remove?.();
   row?.focus();
 });
 document.addEventListener("pointerdown", event => {
