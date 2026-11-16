@@ -29,6 +29,7 @@
       <symbol id="icon-rescan" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 9a7 7 0 0 1 12-2l3 5M19 15a7 7 0 0 1-12 2l-3-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-reconnect" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 4h12l3 3v13H4V4h1Zm3 0v6h8V4M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-load" viewBox="0 0 24 24"><path d="M4 5h10M4 10h10M4 15h6m4 0 3 3 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </svg>
     <main class="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-4 px-4 pb-12 pt-5 sm:px-6 lg:h-screen lg:min-h-0 lg:px-8">
@@ -206,9 +207,12 @@
             <form id="generate-form" class="hidden border-b border-[#e1e9e7] px-4 py-3">
               <label for="generate-minutes" class="block text-base font-medium">Generate random tracks</label>
               <div class="mt-2 flex items-center gap-2">
-                <input id="generate-minutes" type="number" min="1" step="1" value="15" list="generate-minutes-options" required class="w-[5.5rem] shrink-0 rounded-md border border-[#cbd6d9] px-3 py-2 text-base tabular-nums outline-none focus:border-[#315e55]">
-                <datalist id="generate-minutes-options"><option value="5"></option><option value="10"></option><option value="15"></option><option value="20"></option><option value="30"></option><option value="45"></option><option value="60"></option></datalist>
-                <span class="text-base text-[#5d7079]">min</span>
+                <div id="generate-field" class="flex h-10 cursor-text w-[7.5rem] shrink-0 items-center rounded-md border border-[#cbd6d9] bg-white transition-colors focus-within:border-[#315e55] focus-within:ring-2 focus-within:ring-[#315e55]/15">
+                  <input id="generate-minutes" type="text" inputmode="numeric" maxlength="4" value="15" required autocomplete="off" role="combobox" aria-autocomplete="none" aria-expanded="false" aria-controls="generate-options" class="min-w-0 flex-1 bg-transparent py-2 pl-3 text-base tabular-nums outline-none disabled:opacity-40">
+                  <span aria-hidden="true" class="text-sm text-[#5d7079]">min</span>
+                  <button id="generate-toggle" type="button" tabindex="-1" aria-label="Show durations" class="group ml-1 flex h-full w-7 shrink-0 items-center justify-center rounded-r-md border-l border-[#e1e9e7] text-[#5d7079] hover:bg-[#f1f6f4] hover:text-[#273b44] disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
+                </div>
+                <ul id="generate-options" role="listbox" aria-label="Durations" class="fixed z-50 hidden rounded-md border border-[#d6e0df] bg-white py-1 text-sm text-[#273b44] shadow-lg"></ul>
                 <button id="generate-submit" type="submit" aria-label="Generate" title="Generate" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
                 <button id="generate-cancel" type="button" aria-label="Cancel generating" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
               </div>

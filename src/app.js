@@ -8,7 +8,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-minutes", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -773,7 +773,7 @@ function render() {
   elements["save-submit"].disabled = busy || !paths.length;
   elements["playlist-name"].disabled = busy;
   elements["save-cancel"].disabled = busy;
-  for (const id of ["generate-playlist", "generate-submit", "generate-minutes", "generate-cancel"]) elements[id].disabled = busy || !library;
+  for (const id of ["generate-playlist", "generate-submit", "generate-minutes", "generate-toggle", "generate-cancel"]) elements[id].disabled = busy || !library;
   elements.playlist.replaceChildren();
   paths.forEach((path, index) => {
     const track = trackFor(path);
@@ -884,6 +884,74 @@ function moveItem(items, from, to) {
 let contextRow = null;
 let contextRemove = null;
 
+const GENERATE_PRESETS = [5, 10, 15, 20, 25, 30, 45, 60];
+
+function renderGenerateOptions() {
+  elements["generate-options"].replaceChildren(...GENERATE_PRESETS.map(minutes => {
+    const option = document.createElement("li");
+    option.id = `generate-option-${minutes}`;
+    option.setAttribute("role", "option");
+    option.dataset.minutes = minutes;
+    option.className = "group flex cursor-pointer items-center justify-between gap-4 py-1.5 pl-3 pr-2 tabular-nums hover:bg-[#f1f6f4] aria-selected:bg-[#edf5f1] aria-selected:font-semibold aria-selected:text-[#284f48]";
+    option.innerHTML = `<span>${minutes} min</span><svg aria-hidden="true" class="invisible h-4 w-4 group-aria-selected:visible"><use href="#icon-added"></use></svg>`;
+    return option;
+  }));
+}
+
+function isGenerateOptionsOpen() {
+  return !elements["generate-options"].classList.contains("hidden");
+}
+
+// Marks the preset matching the typed value; the full list always stays visible.
+function syncGenerateOptions() {
+  const input = elements["generate-minutes"];
+  let selected = null;
+  for (const option of elements["generate-options"].children) {
+    const match = input.value !== "" && option.dataset.minutes === String(Number(input.value));
+    option.setAttribute("aria-selected", String(match));
+    if (match) selected = option;
+  }
+  if (selected) input.setAttribute("aria-activedescendant", selected.id);
+  else input.removeAttribute("aria-activedescendant");
+}
+
+function openGenerateOptions() {
+  const list = elements["generate-options"];
+  if (elements["generate-minutes"].disabled) return;
+  syncGenerateOptions();
+  list.classList.remove("hidden");
+  const field = elements["generate-field"].getBoundingClientRect();
+  list.style.minWidth = `${field.width}px`;
+  list.style.left = `${Math.max(4, Math.min(field.left, window.innerWidth - list.offsetWidth - 4))}px`;
+  const below = field.bottom + 4;
+  list.style.top = `${below + list.offsetHeight > window.innerHeight - 4 ? Math.max(4, field.top - list.offsetHeight - 4) : below}px`;
+  elements["generate-minutes"].setAttribute("aria-expanded", "true");
+  elements["generate-toggle"].setAttribute("aria-expanded", "true");
+}
+
+function closeGenerateOptions() {
+  elements["generate-options"].classList.add("hidden");
+  elements["generate-minutes"].setAttribute("aria-expanded", "false");
+  elements["generate-toggle"].setAttribute("aria-expanded", "false");
+}
+
+function focusGenerateMinutes(open = false) {
+  const input = elements["generate-minutes"];
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  if (open) openGenerateOptions();
+}
+
+// Arrow keys move to the next/previous preset, starting from whatever value is typed.
+function stepGenerateMinutes(direction) {
+  const input = elements["generate-minutes"];
+  const current = Number(input.value) || 0;
+  input.value = direction > 0
+    ? GENERATE_PRESETS.find(minutes => minutes > current) ?? GENERATE_PRESETS.at(-1)
+    : GENERATE_PRESETS.findLast(minutes => minutes < current) ?? GENERATE_PRESETS[0];
+  focusGenerateMinutes(true);
+}
+
 function hideContextMenu() {
   elements["context-menu"].classList.add("hidden");
   contextRow?.classList.remove("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
@@ -993,6 +1061,7 @@ async function generatePlaylist() {
     return;
   }
   if (!await updatePlaylist([...playlistPaths(), ...paths])) return;
+  closeGenerateOptions();
   elements["generate-form"].classList.add("hidden");
   notice(`Added ${paths.length.toLocaleString()} random ${paths.length === 1 ? "track" : "tracks"} (${formatTotal(paths.map(trackFor))}).`);
 }
@@ -1426,6 +1495,7 @@ for (const metric of ["albums", "tracks"]) {
   });
 }
 elements["save-playlist"].addEventListener("click", () => {
+  closeGenerateOptions();
   elements["generate-form"].classList.add("hidden");
   if (elements["save-form"].classList.contains("hidden")) {
     elements["save-form"].classList.remove("hidden");
@@ -1448,21 +1518,59 @@ elements["save-form"].addEventListener("submit", event => {
 elements["generate-playlist"].addEventListener("click", () => {
   elements["save-form"].classList.add("hidden");
   elements["generate-form"].classList.remove("hidden");
-  const input = elements["generate-minutes"];
-  input.focus();
-  // Number inputs don't support setSelectionRange, so briefly switch to text to place the caret at the end.
-  input.type = "text";
-  input.setSelectionRange(input.value.length, input.value.length);
-  input.type = "number";
+  focusGenerateMinutes();
 });
 elements["generate-cancel"].addEventListener("click", () => {
+  closeGenerateOptions();
   elements["generate-form"].classList.add("hidden");
   elements["generate-playlist"].focus();
 });
 elements["generate-form"].addEventListener("submit", event => {
   event.preventDefault();
+  closeGenerateOptions();
   generatePlaylist();
 });
+elements["generate-minutes"].addEventListener("focus", openGenerateOptions);
+elements["generate-minutes"].addEventListener("click", openGenerateOptions);
+elements["generate-minutes"].addEventListener("blur", closeGenerateOptions);
+elements["generate-minutes"].addEventListener("input", () => {
+  const input = elements["generate-minutes"];
+  const digits = input.value.replace(/\D+/g, "");
+  if (digits !== input.value) input.value = digits;
+  syncGenerateOptions();
+});
+elements["generate-minutes"].addEventListener("keydown", event => {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    stepGenerateMinutes(event.key === "ArrowDown" ? 1 : -1);
+  } else if (event.key === "Escape" && isGenerateOptionsOpen()) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeGenerateOptions();
+  }
+});
+// Clicking anywhere in the field (e.g. the "min" suffix) acts like clicking the input.
+elements["generate-field"].addEventListener("pointerdown", event => {
+  if (event.target === elements["generate-minutes"] || elements["generate-toggle"].contains(event.target)) return;
+  event.preventDefault();
+  focusGenerateMinutes(true);
+});
+elements["generate-toggle"].addEventListener("pointerdown", event => event.preventDefault());
+elements["generate-toggle"].addEventListener("click", () => {
+  if (isGenerateOptionsOpen()) closeGenerateOptions();
+  else focusGenerateMinutes(true);
+});
+elements["generate-options"].addEventListener("pointerdown", event => event.preventDefault());
+elements["generate-options"].addEventListener("click", event => {
+  const option = event.target.closest("[data-minutes]");
+  if (!option) return;
+  elements["generate-minutes"].value = option.dataset.minutes;
+  closeGenerateOptions();
+  focusGenerateMinutes();
+});
+window.addEventListener("resize", closeGenerateOptions);
+document.addEventListener("scroll", closeGenerateOptions, true);
+renderGenerateOptions();
 elements["context-remove"].addEventListener("click", () => {
   const row = contextRow;
   const remove = contextRemove;
