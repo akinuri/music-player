@@ -12,6 +12,7 @@
     <svg aria-hidden="true" class="absolute h-0 w-0 overflow-hidden" xmlns="http://www.w3.org/2000/svg">
       <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></symbol>
       <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM14 5h4v14h-4z" fill="currentColor"/></symbol>
+      <symbol id="icon-stop" viewBox="0 0 24 24"><path d="M7 7h10v10H7z" fill="currentColor"/></symbol>
       <symbol id="icon-previous" viewBox="0 0 24 24"><path d="M6 5v14M19 5 9 12l10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-next" viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -156,6 +157,7 @@
               <span id="playback-duration" class="w-10 shrink-0 text-right">—</span>
             </div>
             <div class="mt-4 flex items-center gap-2">
+              <button id="stop" type="button" aria-label="Stop" title="Stop" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-stop"></use></svg></button>
               <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
               <button id="play-pause" type="button" aria-label="Play" title="Play" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-play"></use></svg></button>
               <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
