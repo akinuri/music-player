@@ -739,7 +739,7 @@ function render() {
     });
   } else [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })).forEach((saved, index) => {
     const trackCount = saved.tracks.length;
-    const row = itemRow(index, saved.name, `${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, formatTotal(saved.tracks), "cursor-pointer sm:px-6");
+    const row = itemRow(index, saved.name, [`${trackCount.toLocaleString()} ${trackCount === 1 ? "track" : "tracks"}`, formatTotal(saved.tracks)], "", "cursor-pointer sm:px-6");
     const nameButton = document.createElement("button");
     nameButton.type = "button";
     nameButton.className = row.querySelector("[data-title]").className;
@@ -806,14 +806,18 @@ function itemRow(index, titleText, metaText, timeText, extraClass = "") {
   title.dataset.title = "";
   title.className = "max-w-[55%] shrink-0 truncate font-semibold text-[#263940]";
   title.textContent = titleText;
-  const dot = document.createElement("span");
-  dot.className = "shrink-0 text-[#a3b0b4]";
-  dot.setAttribute("aria-hidden", "true");
-  dot.textContent = "·";
-  const meta = document.createElement("span");
-  meta.className = "min-w-0 flex-1 truncate text-[#5d7079]";
-  meta.textContent = metaText;
-  details.append(title, dot, meta);
+  const parts = [].concat(metaText);
+  details.append(title);
+  parts.forEach((part, i) => {
+    const separator = document.createElement("span");
+    separator.className = "shrink-0 text-[#a3b0b4]";
+    separator.setAttribute("aria-hidden", "true");
+    separator.textContent = "·";
+    const meta = document.createElement("span");
+    meta.className = i === parts.length - 1 ? "min-w-0 flex-1 truncate text-[#5d7079]" : "shrink-0 text-[#5d7079]";
+    meta.textContent = part;
+    details.append(separator, meta);
+  });
   const time = document.createElement("span");
   time.className = "shrink-0 tabular-nums text-[#5d7079]";
   time.textContent = timeText;
