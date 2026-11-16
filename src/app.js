@@ -735,6 +735,7 @@ function render() {
         event.preventDefault();
         openContextMenu(row, () => removeSavedTrack(selected, index), event);
       });
+      makeReorderable(row, index, elements["saved-playlists"], (from, to) => updateSavedTracks(selected, moveItem(selected.tracks, from, to), "reorder"));
       elements["saved-playlists"].append(row);
     });
   } else [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })).forEach((saved, index) => {
@@ -788,6 +789,7 @@ function render() {
       event.preventDefault();
       openContextMenu(row, () => updatePlaylist(paths.filter((_, i) => i !== index)), event);
     });
+    makeReorderable(row, index, elements.playlist, (from, to) => updatePlaylist(moveItem(paths, from, to)));
     elements.playlist.append(row);
   });
   renderPlayback();
@@ -823,6 +825,54 @@ function itemRow(index, titleText, metaText, timeText, extraClass = "") {
   time.textContent = timeText;
   row.append(number, details, time);
   return row;
+}
+
+let dragState = null;
+const dropMarks = ["shadow-[inset_0_2px_0_#315e55]", "shadow-[inset_0_-2px_0_#315e55]"];
+
+// Makes a row draggable within its container; move(from, to) receives final indexes.
+function makeReorderable(row, index, container, move) {
+  const isAfter = event => event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2;
+  const clearMarks = () => row.classList.remove(...dropMarks);
+  row.draggable = true;
+  row.addEventListener("dragstart", event => {
+    if (busy || event.target !== row) return event.preventDefault();
+    dragState = { container, index };
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+    row.classList.add("opacity-50");
+  });
+  row.addEventListener("dragend", () => {
+    dragState = null;
+    row.classList.remove("opacity-50");
+    for (const item of container.children) item.classList.remove(...dropMarks);
+  });
+  row.addEventListener("dragover", event => {
+    if (dragState?.container !== container) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    clearMarks();
+    row.classList.add(dropMarks[isAfter(event) ? 1 : 0]);
+  });
+  row.addEventListener("dragleave", event => {
+    if (!row.contains(event.relatedTarget)) clearMarks();
+  });
+  row.addEventListener("drop", event => {
+    if (dragState?.container !== container) return;
+    event.preventDefault();
+    clearMarks();
+    const from = dragState.index;
+    let to = index + (isAfter(event) ? 1 : 0);
+    if (to > from) to--;
+    dragState = null;
+    if (to !== from && !busy) move(from, to);
+  });
+}
+
+function moveItem(items, from, to) {
+  const next = [...items];
+  next.splice(to, 0, next.splice(from, 1)[0]);
+  return next;
 }
 
 let contextRow = null;
@@ -1053,16 +1103,20 @@ async function loadPlaylist(saved) {
 }
 
 async function removeSavedTrack(saved, index) {
+  return updateSavedTracks(saved, saved.tracks.filter((_, i) => i !== index), "remove");
+}
+
+async function updateSavedTracks(saved, tracks, action) {
   if (busy) return;
   busy = true;
   render();
   try {
-    const updated = { ...saved, tracks: saved.tracks.filter((_, i) => i !== index) };
+    const updated = { ...saved, tracks };
     await saveSavedPlaylist(updated);
     savedPlaylists = savedPlaylists.map(item => item.id === saved.id ? updated : item);
   } catch (error) {
     console.error("Could not update playlist:", error);
-    notice("Couldn't remove the track. The playlist was not changed.", true);
+    notice(`Couldn't ${action} the track. The playlist was not changed.`, true);
   } finally {
     busy = false;
     render();
