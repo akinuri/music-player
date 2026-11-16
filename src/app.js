@@ -1303,6 +1303,57 @@ async function runScan(handle) {
 }
 
 elements["dismiss-notice"].addEventListener("click", hideNotice);
+
+const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]"];
+
+function setDropState(active) {
+  const target = elements["choose-folder"];
+  target.classList.toggle("relative", active);
+  target.classList.toggle("z-10", active);
+  for (const name of dropActive) target.classList.toggle(name, active);
+}
+
+const dragHasFiles = event => [...(event.dataTransfer?.types || [])].includes("Files");
+const canDropFolder = () => !busy && "showDirectoryPicker" in window && "getAsFileSystemHandle" in DataTransferItem.prototype;
+
+// dragenter/dragleave fire for every element crossed, so a depth count (not relatedTarget) tells when the drag really leaves the window.
+let dragDepth = 0;
+
+document.addEventListener("dragenter", event => {
+  if (!dragHasFiles(event)) return;
+  dragDepth++;
+  if (canDropFolder()) setDropState(true);
+});
+document.addEventListener("dragover", event => {
+  if (!dragHasFiles(event)) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = canDropFolder() && elements["choose-folder"].contains(event.target) ? "copy" : "none";
+});
+document.addEventListener("dragleave", event => {
+  if (!dragHasFiles(event)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) setDropState(false);
+});
+document.addEventListener("drop", async event => {
+  if (!dragHasFiles(event)) return;
+  event.preventDefault();
+  dragDepth = 0;
+  setDropState(false);
+  if (!canDropFolder() || !elements["choose-folder"].contains(event.target)) return;
+  try {
+    const handles = await Promise.all([...event.dataTransfer.items].filter(item => item.kind === "file").map(item => item.getAsFileSystemHandle()));
+    const folder = handles.find(handle => handle?.kind === "directory");
+    if (!folder) notice("Drop a folder, not files.", true);
+    else await runScan(folder);
+  } catch (error) {
+    console.error("Folder drop failed:", error);
+    notice("Couldn't open that folder. Check browser permissions and try again.", true);
+  }
+});
+document.addEventListener("dragend", () => {
+  dragDepth = 0;
+  setDropState(false);
+});
 elements["choose-folder"].addEventListener("click", async () => {
   try {
     const handle = await window.showDirectoryPicker({ mode: "read" });
