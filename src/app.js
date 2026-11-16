@@ -722,9 +722,10 @@ function render() {
         track.title || currentTrack?.title || track.path,
         [track.artist || currentTrack?.artist || "Unknown artist", albumName ? albumText({ album: albumName, year: track.year ?? currentTrack?.year }) : ""].filter(Boolean).join(" · "),
         formatDuration(track.duration),
-        "sm:px-6"
+        "select-none sm:px-6"
       );
       setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || track.path, track.trackNumber ?? currentTrack?.trackNumber);
+      row.addEventListener("dblclick", () => playSavedTrack(selected, track.path));
       elements["saved-playlists"].append(row);
     });
   } else [...savedPlaylists].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })).forEach((saved, index) => {
@@ -1026,14 +1027,23 @@ async function loadPlaylist(saved) {
     busy = false;
     render();
   }
-  if (matches === undefined) return;
+  if (matches === undefined) return false;
   if (!matches) {
     notice(`Choose the folder "${saved.folderName}" before loading this playlist.`, true);
-    return;
+    return false;
   }
   if (await updatePlaylist(saved.tracks.map(track => track.path), { loadedPlaylistId: saved.id })) {
     notice(`Loaded playlist "${saved.name}".`);
+    return true;
   }
+  return false;
+}
+
+async function playSavedTrack(saved, path) {
+  if (busy) return;
+  const paths = saved.tracks.map(track => track.path);
+  const alreadyLoaded = library?.loadedPlaylistId === saved.id && playlistPaths().length === paths.length && playlistPaths().every((item, index) => item === paths[index]);
+  if (alreadyLoaded || await loadPlaylist(saved)) playTrack(path);
 }
 
 async function removeSavedPlaylist(saved) {
