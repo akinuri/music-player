@@ -1343,11 +1343,19 @@ player.audio.addEventListener("volumechange", () => {
   renderVolume();
   saveVolume();
 });
-elements.volume.addEventListener("input", () => {
-  const level = Number(elements.volume.value);
+function setVolumeLevel(level) {
   player.audio.muted = level === 0;
   if (level > 0) player.audio.volume = level / 100;
-});
+  renderVolume();
+}
+
+elements.volume.addEventListener("input", () => setVolumeLevel(Number(elements.volume.value)));
+elements.volume.addEventListener("wheel", event => {
+  event.preventDefault();
+  const step = Number(elements.volume.step) || 1;
+  const current = player.audio.muted ? 0 : Math.round(player.audio.volume * 100);
+  setVolumeLevel(Math.min(100, Math.max(0, current + (event.deltaY < 0 ? step : -step))));
+}, { passive: false });
 elements.mute.addEventListener("click", () => {
   if (player.audio.muted || player.audio.volume === 0) {
     player.audio.muted = false;
