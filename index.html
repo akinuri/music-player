@@ -206,7 +206,8 @@
             <form id="generate-form" class="hidden border-b border-[#e1e9e7] px-4 py-3">
               <label for="generate-minutes" class="block text-base font-medium">Generate random tracks</label>
               <div class="mt-2 flex items-center gap-2">
-                <input id="generate-minutes" type="number" min="1" step="1" value="30" required class="w-20 shrink-0 rounded-md border border-[#cbd6d9] px-3 py-2 text-base tabular-nums outline-none focus:border-[#315e55]">
+                <input id="generate-minutes" type="number" min="1" step="1" value="15" list="generate-minutes-options" required class="w-[5.5rem] shrink-0 rounded-md border border-[#cbd6d9] px-3 py-2 text-base tabular-nums outline-none focus:border-[#315e55]">
+                <datalist id="generate-minutes-options"><option value="5"></option><option value="10"></option><option value="15"></option><option value="20"></option><option value="30"></option><option value="45"></option><option value="60"></option></datalist>
                 <span class="text-base text-[#5d7079]">min</span>
                 <button id="generate-submit" type="submit" aria-label="Generate" title="Generate" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
                 <button id="generate-cancel" type="button" aria-label="Cancel generating" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
