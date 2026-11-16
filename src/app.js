@@ -594,7 +594,7 @@ function render() {
   elements["group-rows"].replaceChildren();
   elements["track-rows"].replaceChildren();
   if (grouped) {
-    for (const group of groups) {
+    for (const [position, group] of groups.entries()) {
       const row = document.createElement("tr");
       row.className = "cursor-pointer border-b border-[#e7ecec] hover:bg-[#f7faf9] last:border-b-0";
       const name = groupName(group.key, groupMode);
@@ -617,7 +617,7 @@ function render() {
       nameButton.title = name;
       nameButton.addEventListener("click", open);
       nameCell.append(nameButton);
-      row.append(nameCell);
+      row.append(trackCell(String(position + 1), "tabular-nums text-[#5d7079]"), nameCell);
       if (albumsPage) {
         const artistLabel = groupArtistLabel(group);
         row.append(trackCell(artistLabel, "text-[#5d7079]"));
