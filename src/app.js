@@ -998,6 +998,8 @@ async function saveNamedPlaylist() {
     const saved = createSavedPlaylist(name, library, existing);
     await saveSavedPlaylist(saved);
     savedPlaylists = [...savedPlaylists.filter(item => item.id !== saved.id), saved];
+    library = { ...library, loadedPlaylistId: saved.id };
+    await saveLibrary(library);
     await refreshSelectedPlaylistMatch();
     elements["save-form"].classList.add("hidden");
     elements["playlist-name"].value = "";
@@ -1031,7 +1033,7 @@ async function loadPlaylist(saved) {
     notice(`Choose the folder "${saved.folderName}" before loading this playlist.`, true);
     return;
   }
-  if (await updatePlaylist(saved.tracks.map(track => track.path))) {
+  if (await updatePlaylist(saved.tracks.map(track => track.path), { loadedPlaylistId: saved.id })) {
     notice(`Loaded playlist "${saved.name}".`);
   }
 }
@@ -1043,6 +1045,10 @@ async function removeSavedPlaylist(saved) {
   try {
     await deleteSavedPlaylist(saved.id);
     savedPlaylists = savedPlaylists.filter(item => item.id !== saved.id);
+    if (library?.loadedPlaylistId === saved.id) {
+      library = { ...library, loadedPlaylistId: null };
+      await saveLibrary(library);
+    }
     if (selectedPlaylistId === saved.id) selectedPlaylistId = null;
     notice(`Deleted playlist "${saved.name}".`);
   } catch (error) {
@@ -1054,12 +1060,12 @@ async function removeSavedPlaylist(saved) {
   }
 }
 
-async function updatePlaylist(paths) {
+async function updatePlaylist(paths, extra = {}) {
   if (!library || busy) return false;
   busy = true;
   render();
   try {
-    const next = { ...library, playlist: paths };
+    const next = { ...library, playlist: paths, ...extra, ...(paths.length ? {} : { loadedPlaylistId: null }) };
     await saveLibrary(next);
     library = next;
     if ((player.path && !paths.includes(player.path)) || (player.pendingPath && !paths.includes(player.pendingPath))) {
@@ -1173,7 +1179,7 @@ async function runScan(handle) {
   try {
     const { tracks, warnings } = await scanLibrary(handle, readMetadata, count => notice(`Scanning your folder… ${count.toLocaleString()} tracks indexed`, false, [], { sticky: true }));
     const sameFolder = library && await library.handle.isSameEntry(handle);
-    const next = { handle, folderName: handle.name, tracks, scannedAt: Date.now(), playlist: sameFolder ? playlistPaths() : [] };
+    const next = { handle, folderName: handle.name, tracks, scannedAt: Date.now(), playlist: sameFolder ? playlistPaths() : [], loadedPlaylistId: sameFolder ? library.loadedPlaylistId ?? null : null };
     await saveLibrary(next);
     if (!sameFolder) {
       player.stop();
@@ -1272,8 +1278,14 @@ for (const metric of ["albums", "tracks"]) {
 }
 elements["save-playlist"].addEventListener("click", () => {
   elements["generate-form"].classList.add("hidden");
-  elements["save-form"].classList.remove("hidden");
+  if (elements["save-form"].classList.contains("hidden")) {
+    elements["save-form"].classList.remove("hidden");
+    const loaded = savedPlaylists.find(item => item.id === library?.loadedPlaylistId);
+    elements["playlist-name"].value = loaded?.name || "";
+  }
   elements["playlist-name"].focus();
+  const end = elements["playlist-name"].value.length;
+  elements["playlist-name"].setSelectionRange(end, end);
 });
 elements["save-cancel"].addEventListener("click", () => {
   elements["save-form"].classList.add("hidden");
