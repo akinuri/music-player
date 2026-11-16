@@ -24,7 +24,7 @@ test("imported playlists get a unique name and refresh tags from the connected l
   assert.equal(imported.tracks[1].title, "Gone");
 });
 
-test("generates a random selection within the target, skipping excluded and unmeasurable tracks", () => {
+test("generates random tracks until the target is reached, skipping excluded and unmeasurable tracks", () => {
   const tracks = [
     { path: "a", duration: 100 },
     { path: "b", duration: 200 },
@@ -34,11 +34,13 @@ test("generates a random selection within the target, skipping excluded and unme
   ];
   const first = () => 0;
   const result = generatePlaylistPaths(tracks, 400, { exclude: ["a"], random: first });
-  assert.ok(result.duration <= 400);
+  // Stops once the target is reached, without skipping long tracks to fill the gap.
+  assert.ok(result.duration >= 400);
+  assert.ok(result.duration - tracks.find(track => track.path === result.paths.at(-1)).duration < 400);
   assert.ok(!result.paths.includes("a") && !result.paths.includes("d"));
   assert.equal(result.duration, result.paths.reduce((sum, path) => sum + tracks.find(track => track.path === path).duration, 0));
   assert.equal(new Set(result.paths).size, result.paths.length);
-  assert.deepEqual(generatePlaylistPaths(tracks, 10), { paths: [], duration: 0, available: 4 });
+  assert.equal(generatePlaylistPaths(tracks, 10).paths.length, 1);
   assert.deepEqual(generatePlaylistPaths(tracks, 10000, { exclude: ["a", "b", "c", "e"] }), { paths: [], duration: 0, available: 0 });
   assert.equal(generatePlaylistPaths(tracks, 10000).paths.length, 4);
 });

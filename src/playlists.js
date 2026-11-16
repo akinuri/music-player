@@ -80,7 +80,7 @@ export function createImportedPlaylist(parsed, library, existingNames, id = cryp
   };
 }
 
-// Picks random tracks without exceeding the target. Tracks with unknown duration can't be measured, so they are skipped.
+// Takes shuffled tracks until the total reaches the target (the last track may overshoot). Tracks with unknown duration can't be measured, so they are skipped.
 export function generatePlaylistPaths(tracks, targetSeconds, { exclude = [], random = Math.random } = {}) {
   const skip = new Set(exclude);
   const pool = tracks.filter(track => Number.isFinite(track.duration) && track.duration > 0 && !skip.has(track.path));
@@ -91,10 +91,9 @@ export function generatePlaylistPaths(tracks, targetSeconds, { exclude = [], ran
   const paths = [];
   let duration = 0;
   for (const track of pool) {
-    if (duration + track.duration <= targetSeconds) {
-      paths.push(track.path);
-      duration += track.duration;
-    }
+    if (duration >= targetSeconds) break;
+    paths.push(track.path);
+    duration += track.duration;
   }
   return { paths, duration, available: pool.length };
 }

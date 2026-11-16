@@ -987,11 +987,9 @@ async function generatePlaylist() {
     elements["generate-minutes"].focus();
     return;
   }
-  const { paths, available } = generatePlaylistPaths(library.tracks, minutes * 60, { exclude: playlistPaths() });
+  const { paths } = generatePlaylistPaths(library.tracks, minutes * 60, { exclude: playlistPaths() });
   if (!paths.length) {
-    notice(available
-      ? `No new tracks fit within ${minutes.toLocaleString()} ${minutes === 1 ? "minute" : "minutes"}. Try a longer duration.`
-      : "Every track with a known duration is already in the playlist.", true);
+    notice("Every track with a known duration is already in the playlist.", true);
     return;
   }
   if (!await updatePlaylist([...playlistPaths(), ...paths])) return;
