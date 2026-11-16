@@ -1450,8 +1450,12 @@ elements["save-form"].addEventListener("submit", event => {
 elements["generate-playlist"].addEventListener("click", () => {
   elements["save-form"].classList.add("hidden");
   elements["generate-form"].classList.remove("hidden");
-  elements["generate-minutes"].focus();
-  elements["generate-minutes"].select();
+  const input = elements["generate-minutes"];
+  input.focus();
+  // Number inputs don't support setSelectionRange, so briefly switch to text to place the caret at the end.
+  input.type = "text";
+  input.setSelectionRange(input.value.length, input.value.length);
+  input.type = "number";
 });
 elements["generate-cancel"].addEventListener("click", () => {
   elements["generate-form"].classList.add("hidden");
