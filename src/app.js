@@ -1416,12 +1416,19 @@ async function runScan(handle) {
 elements["dismiss-notice"].addEventListener("click", hideNotice);
 
 const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]"];
+// Extra emphasis while the drag is over the button itself, i.e. a drop would land.
+const dropHover = ["!border-solid", "!bg-[#d3e6dc]", "!text-[#284f48]", "ring-4", "ring-[#315e55]/20"];
 
 function setDropState(active) {
   const target = elements["choose-folder"];
   target.classList.toggle("relative", active);
   target.classList.toggle("z-10", active);
   for (const name of dropActive) target.classList.toggle(name, active);
+  if (!active) setDropHover(false);
+}
+
+function setDropHover(active) {
+  for (const name of dropHover) elements["choose-folder"].classList.toggle(name, active);
 }
 
 const dragHasFiles = event => [...(event.dataTransfer?.types || [])].includes("Files");
@@ -1438,7 +1445,9 @@ document.addEventListener("dragenter", event => {
 document.addEventListener("dragover", event => {
   if (!dragHasFiles(event)) return;
   event.preventDefault();
-  event.dataTransfer.dropEffect = canDropFolder() && elements["choose-folder"].contains(event.target) ? "copy" : "none";
+  const overButton = canDropFolder() && elements["choose-folder"].contains(event.target);
+  event.dataTransfer.dropEffect = overButton ? "copy" : "none";
+  setDropHover(overButton);
 });
 document.addEventListener("dragleave", event => {
   if (!dragHasFiles(event)) return;
