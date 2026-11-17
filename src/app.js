@@ -665,6 +665,10 @@ function render() {
     }
     currentAlbumView = albumViewKey;
   }
+  if (routeTrackSort) {
+    ({ key: sortKey, direction: sortDirection } = routeTrackSort === "default" ? { key: hideTrackAlbum ? "trackNumber" : "title", direction: "ascending" } : routeTrackSort);
+    routeTrackSort = null;
+  }
   if ((hideTrackArtist && sortKey === "artist") || (hideTrackAlbum && sortKey === "album")) {
     sortKey = "title";
     sortDirection = "ascending";
@@ -1962,6 +1966,42 @@ renderVolume();
 
 const routeModes = { tracks: "track", artists: "artist", albums: "album" };
 let historyReady = false;
+const trackSortKeys = new Set([...sortButtons].map(button => button.dataset.sort));
+const groupSortKeys = new Set([...groupSortButtons].map(button => button.dataset.groupSort));
+// A sort read from the URL, applied by render() once it has settled the album-view defaults ("default" = that view's default).
+let routeTrackSort = null;
+
+// Which list the library view shows: a list of artists/albums (with its group mode), or tracks (with their default sort).
+function libraryShape() {
+  const artistAlbums = libraryMode === "artist" && libraryGroup !== null;
+  const grouped = libraryMode !== "track" && (libraryGroup === null || (artistAlbums && artistAlbum === null));
+  const albumTracks = (libraryMode === "artist" && artistAlbum !== null) || (libraryMode === "album" && libraryGroup !== null);
+  return { grouped, groupMode: artistAlbums ? "album" : libraryMode, trackDefault: albumTracks ? "trackNumber" : "title" };
+}
+
+// "?sort=key&order=desc" for the visible list, or "" when it uses its default sort.
+function sortQuery() {
+  const shape = libraryShape();
+  const { key, direction } = shape.grouped ? groupSort[shape.groupMode] : { key: sortKey, direction: sortDirection };
+  const defaultKey = shape.grouped ? "name" : shape.trackDefault;
+  if (key === defaultKey && direction === "ascending") return "";
+  const params = new URLSearchParams({ sort: key });
+  if (direction === "descending") params.set("order", "desc");
+  return `?${params}`;
+}
+
+function applySortQuery(query) {
+  const params = new URLSearchParams(query);
+  const key = params.get("sort");
+  const direction = params.get("order") === "desc" ? "descending" : "ascending";
+  const shape = libraryShape();
+  if (shape.grouped) {
+    const valid = groupSortKeys.has(key) && !(shape.groupMode === "album" && libraryMode === "artist" && key === "artist");
+    groupSort[shape.groupMode] = valid ? { key, direction } : { key: "name", direction: "ascending" };
+  } else {
+    routeTrackSort = trackSortKeys.has(key) ? { key, direction } : "default";
+  }
+}
 
 function routeHash() {
   const encode = value => encodeURIComponent(value);
@@ -1977,14 +2017,16 @@ function routeHash() {
     segments.push(encode(libraryGroup));
     if (libraryMode === "artist" && artistAlbum !== null) segments.push(encode(artistAlbum));
   }
-  return `#/${segments.join("/")}`;
+  return `#/${segments.join("/")}${sortQuery()}`;
 }
 
 function syncHash() {
   const hash = routeHash();
   if (location.hash === hash) return;
+  // A sort change alone replaces the entry, so Back doesn't step through every sort click.
+  const samePage = location.hash.split("?")[0] === hash.split("?")[0];
   try {
-    history[historyReady ? "pushState" : "replaceState"](null, "", hash);
+    history[historyReady && !samePage ? "pushState" : "replaceState"](null, "", hash);
   } catch (error) {
     console.error("Could not update the address:", error);
   }
@@ -1992,8 +2034,9 @@ function syncHash() {
 
 function applyRoute() {
   let parts;
+  const [path, query = ""] = location.hash.split("?");
   try {
-    parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
+    parts = path.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
   } catch {
     parts = [];
   }
@@ -2021,6 +2064,7 @@ function applyRoute() {
   libraryMode = routeModes[name] || "track";
   libraryGroup = libraryMode === "track" ? null : group ?? null;
   artistAlbum = libraryMode === "artist" && libraryGroup !== null ? album ?? null : null;
+  applySortQuery(query);
 }
 
 function validateRoute() {
