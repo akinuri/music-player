@@ -634,6 +634,8 @@ function render() {
   elements.reconnect.classList.toggle("flex", !!library && permission !== "granted");
   elements.reconnect.disabled = busy;
   elements["choose-folder"].disabled = busy || !("showDirectoryPicker" in window);
+  // Draw attention to the folder button until there is something to play.
+  elements["choose-folder"].classList.toggle("motion-safe:animate-attention", !library && !elements["choose-folder"].disabled);
   elements.rescan.disabled = busy || !library || permission !== "granted";
   elements["reset-library"].classList.toggle("hidden", !library);
   elements["reset-library"].classList.toggle("flex", !!library);
@@ -1447,7 +1449,7 @@ elements["reset-library"].addEventListener("click", () => {
   if (confirm("Reset the library? This forgets the folder, its index and the current playlist. Saved playlists are kept.")) resetLibrary();
 });
 
-const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]"];
+const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]", "!animate-none"];
 // Extra emphasis while the drag is over the button itself, i.e. a drop would land.
 const dropHover = ["!border-solid", "!bg-[#d3e6dc]", "!text-[#284f48]", "ring-4", "ring-[#315e55]/20"];
 
