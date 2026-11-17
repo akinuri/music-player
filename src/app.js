@@ -1064,6 +1064,8 @@ async function generatePlaylist() {
   closeGenerateOptions();
   elements["generate-form"].classList.add("hidden");
   notice(`Added ${paths.length.toLocaleString()} random ${paths.length === 1 ? "track" : "tracks"} (${formatTotal(paths.map(trackFor))}).`);
+  // Start the new tracks unless something is already playing.
+  if (!player.path || player.audio.paused) await playTrack(paths[0]);
 }
 
 function exportPlaylists(playlists, name) {
