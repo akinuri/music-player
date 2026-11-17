@@ -221,6 +221,22 @@ function renderPlayback() {
     row.classList.toggle("bg-[#dcece6]", row.dataset.path === player.path);
     row.classList.toggle("hover:bg-[#f1f6f4]", row.dataset.path !== player.path);
   }
+  if (player.path !== scrolledPath) scrollToPlayingRow();
+}
+
+// Brings the playing track into view when it changes. Only the playlist list scrolls, never the page.
+let scrolledPath = null;
+function scrollToPlayingRow() {
+  const row = player.path && elements.playlist.querySelector(`[data-path="${CSS.escape(player.path)}"]`);
+  const scroller = elements.playlist.closest(".overflow-y-auto");
+  if (!player.path) scrolledPath = null;
+  if (!row || !scroller || !scroller.clientHeight) return;
+  scrolledPath = player.path;
+  const view = scroller.getBoundingClientRect();
+  const bounds = row.getBoundingClientRect();
+  if (bounds.top >= view.top && bounds.bottom <= view.bottom) return;
+  const top = scroller.scrollTop + bounds.top - view.top - (view.height - bounds.height) / 2;
+  scroller.scrollTo({ top, behavior: "smooth" });
 }
 
 const buttonTitles = {
