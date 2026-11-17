@@ -185,7 +185,8 @@
             <div class="flex items-center justify-between gap-3 border-b border-[#e1e9e7] px-4 py-3">
               <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 <h2 id="playlist-heading" tabindex="-1" class="text-base font-semibold">Current playlist</h2>
-                <div class="flex flex-wrap gap-2 text-sm">
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                  <div id="playlist-stats-tabs" role="tablist" aria-label="Playlist stats" class="flex rounded-md bg-[#eef3f2] p-0.5 text-xs"><button type="button" role="tab" data-stats="total" aria-label="Total" title="Total" aria-selected="true" class="rounded px-2 py-0.5 text-[#5d7079] hover:text-[#273b44] aria-selected:bg-white aria-selected:font-medium aria-selected:text-[#284f48] aria-selected:shadow-sm">T</button><button type="button" role="tab" data-stats="elapsed" aria-label="Elapsed" title="Elapsed" aria-selected="false" class="rounded px-2 py-0.5 text-[#5d7079] hover:text-[#273b44] aria-selected:bg-white aria-selected:font-medium aria-selected:text-[#284f48] aria-selected:shadow-sm">E</button><button type="button" role="tab" data-stats="remaining" aria-label="Remaining" title="Remaining" aria-selected="false" class="rounded px-2 py-0.5 text-[#5d7079] hover:text-[#273b44] aria-selected:bg-white aria-selected:font-medium aria-selected:text-[#284f48] aria-selected:shadow-sm">R</button></div>
                   <span id="playlist-count" class="rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]">0 Tracks</span>
                   <span id="playlist-duration" class="rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]">—</span>
                 </div>

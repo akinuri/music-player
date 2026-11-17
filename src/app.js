@@ -8,7 +8,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -222,7 +222,29 @@ function renderPlayback() {
     row.classList.toggle("hover:bg-[#f1f6f4]", row.dataset.path !== player.path);
   }
   if (player.path !== scrolledPath) scrollToPlayingRow();
+  renderPlaylistStats();
 }
+
+// Track count and duration for the whole playlist, or the part before/after the playing track (which itself is excluded).
+let playlistStats = "total";
+try { if (["total", "elapsed", "remaining"].includes(localStorage.getItem("playlistStats"))) playlistStats = localStorage.getItem("playlistStats"); } catch {}
+function renderPlaylistStats() {
+  const paths = playlistPaths();
+  const index = paths.indexOf(player.path);
+  const part = playlistStats === "elapsed" ? paths.slice(0, Math.max(index, 0))
+    : playlistStats === "remaining" ? paths.slice(index + 1)
+    : paths;
+  elements["playlist-count"].textContent = `${part.length.toLocaleString()} ${part.length === 1 ? "Track" : "Tracks"}`;
+  elements["playlist-duration"].textContent = formatTotal(part.map(path => trackFor(path) || { duration: null }));
+  for (const tab of elements["playlist-stats-tabs"].children) tab.setAttribute("aria-selected", String(tab.dataset.stats === playlistStats));
+}
+elements["playlist-stats-tabs"].addEventListener("click", event => {
+  const tab = event.target.closest("[data-stats]");
+  if (!tab) return;
+  playlistStats = tab.dataset.stats;
+  try { localStorage.setItem("playlistStats", playlistStats); } catch {}
+  renderPlaylistStats();
+});
 
 // Brings the playing track into view when it changes. Only the playlist list scrolls, never the page.
 let scrolledPath = null;
@@ -697,7 +719,6 @@ function render() {
   elements["empty-title"].textContent = query ? "No tracks found" : library ? "No MP3 files found" : "No folder selected";
   elements["empty-description"].textContent = query ? "Try a different search term." : library ? "Add MP3 files to your folder and rescan to see them here." : "Choose a folder to index your MP3 files. Files are not uploaded.";
   const paths = playlistPaths();
-  elements["playlist-count"].textContent = `${paths.length.toLocaleString()} ${paths.length === 1 ? "Track" : "Tracks"}`;
   elements["playlist-nav-count"].textContent = savedPlaylists.length.toLocaleString();
   const selected = savedPlaylists.find(saved => saved.id === selectedPlaylistId);
   if (renamingId !== null && (currentView !== "playlists" || renamingId !== selectedPlaylistId)) renamingId = null;
@@ -782,7 +803,6 @@ function render() {
     row.append(actions);
     elements["saved-playlists"].append(row);
   });
-  elements["playlist-duration"].textContent = formatTotal(paths.map(path => trackFor(path) || { duration: null }));
   elements["playlist-empty"].classList.toggle("hidden", paths.length > 0);
   elements["clear-playlist"].disabled = busy || !paths.length;
   elements["save-playlist"].disabled = busy || !paths.length;
