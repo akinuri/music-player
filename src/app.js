@@ -1503,38 +1503,31 @@ function setDropState(active, hovered = null) {
   }
 }
 
-// dragenter/dragleave fire for every element crossed, so a depth count (not relatedTarget) tells when the drag really leaves the window.
-let dragDepth = 0;
+// dragenter/dragleave pairs get unbalanced as the cursor crosses (or re-rendered) child elements, which made the targets flicker.
+// dragover keeps firing every few dozen ms while a drag is over the page, so the state lives as long as dragover does.
+let dragEndTimer = 0;
+function endDrag() {
+  clearTimeout(dragEndTimer);
+  setDropState(false);
+}
 
-document.addEventListener("dragenter", event => {
-  if (!dragHasFiles(event)) return;
-  dragDepth++;
-  setDropState(true);
-});
 document.addEventListener("dragover", event => {
   if (!dragHasFiles(event)) return;
   event.preventDefault();
   const target = dropTargetAt(event);
   event.dataTransfer.dropEffect = target ? "copy" : "none";
   setDropState(true, target?.node);
-});
-document.addEventListener("dragleave", event => {
-  if (!dragHasFiles(event)) return;
-  dragDepth = Math.max(0, dragDepth - 1);
-  if (!dragDepth) setDropState(false);
+  clearTimeout(dragEndTimer);
+  dragEndTimer = setTimeout(endDrag, 200);
 });
 document.addEventListener("drop", async event => {
   if (!dragHasFiles(event)) return;
   event.preventDefault();
-  dragDepth = 0;
   const target = dropTargetAt(event);
-  setDropState(false);
+  endDrag();
   if (target) await target.drop(event.dataTransfer);
 });
-document.addEventListener("dragend", () => {
-  dragDepth = 0;
-  setDropState(false);
-});
+document.addEventListener("dragend", endDrag);
 elements["choose-folder"].addEventListener("click", async () => {
   try {
     const handle = await window.showDirectoryPicker({ mode: "read" });
