@@ -37,6 +37,10 @@ export function saveLibrary(library) {
   return transaction("readwrite", store => store.put(library, KEY));
 }
 
+export function deleteLibrary() {
+  return transaction("readwrite", store => store.delete(KEY));
+}
+
 export function loadSavedPlaylists() {
   return transaction("readonly", store => store.getAll(IDBKeyRange.bound(PLAYLIST_PREFIX, `${PLAYLIST_PREFIX}\uffff`)));
 }

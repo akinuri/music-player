@@ -1,6 +1,6 @@
 import { scanLibrary } from "./filesystem.js";
 import { readMetadata } from "./metadata.js";
-import { loadLibrary, saveLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
+import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
@@ -8,7 +8,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -635,6 +635,9 @@ function render() {
   elements.reconnect.disabled = busy;
   elements["choose-folder"].disabled = busy || !("showDirectoryPicker" in window);
   elements.rescan.disabled = busy || !library || permission !== "granted";
+  elements["reset-library"].classList.toggle("hidden", !library);
+  elements["reset-library"].classList.toggle("flex", !!library);
+  elements["reset-library"].disabled = busy;
   elements["group-rows"].replaceChildren();
   elements["track-rows"].replaceChildren();
   if (grouped) {
@@ -1414,6 +1417,35 @@ async function runScan(handle) {
 }
 
 elements["dismiss-notice"].addEventListener("click", hideNotice);
+
+// Forgets the folder, its index and the current playlist. Saved playlists are kept.
+async function resetLibrary() {
+  if (busy || !library) return;
+  busy = true;
+  render();
+  try {
+    await deleteLibrary();
+    player.stop();
+    clearSession();
+    library = null;
+    permission = "prompt";
+    libraryGroup = null;
+    artistAlbum = null;
+    await refreshSelectedPlaylistMatch();
+    notice("Library reset. Choose a folder to start again.");
+  } catch (error) {
+    console.error("Library reset failed:", error);
+    notice("Couldn't reset the library. Check your browser's storage settings and try again.", true);
+  } finally {
+    busy = false;
+    render();
+    if (!library) elements["choose-folder"].focus();
+  }
+}
+
+elements["reset-library"].addEventListener("click", () => {
+  if (confirm("Reset the library? This forgets the folder, its index and the current playlist. Saved playlists are kept.")) resetLibrary();
+});
 
 const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]"];
 // Extra emphasis while the drag is over the button itself, i.e. a drop would land.
