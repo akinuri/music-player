@@ -58,6 +58,9 @@
           <nav class="shrink-0 rounded-xl border border-[#d6e0df] bg-white px-3 py-3 text-[#273b44] shadow-sm" aria-label="Visualizer">
             <button id="nav-visualizer" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Visualizer</span></button>
           </nav>
+          <nav class="shrink-0 rounded-xl border border-[#d6e0df] bg-white px-3 py-3 text-[#273b44] shadow-sm" aria-label="Lyrics">
+            <button id="nav-lyrics" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Lyrics</span></button>
+          </nav>
           <div class="flex shrink-0 flex-wrap items-center gap-2 px-1">
             <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#284f48] bg-[#315e55] text-white shadow-sm hover:bg-[#284f48] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
             <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 origin-center items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm transition-transform duration-150 hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
@@ -157,6 +160,17 @@
           <div class="relative min-h-[260px] flex-1">
             <canvas id="visualizer-canvas" class="absolute left-2 top-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] sm:left-4 sm:w-[calc(100%-2rem)]" aria-hidden="true"></canvas>
             <p id="visualizer-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-[#5d7079]">Play a track to see it here.</p>
+          </div>
+        </section>
+
+        <section id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="lyrics-heading">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+            <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
+            <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
+          </div>
+          <div id="lyrics-body" class="relative flex min-h-[260px] max-h-[70vh] flex-1 flex-col py-6 pl-4 pr-2 sm:pl-6 lg:max-h-none lg:min-h-0">
+            <div id="lyrics-lines" class="-ml-2 min-h-0 flex-1 overflow-y-auto pl-2 pr-4 text-lg leading-relaxed"></div>
+            <p id="lyrics-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-[#5d7079]">Play a track to see its lyrics.</p>
           </div>
         </section>
 

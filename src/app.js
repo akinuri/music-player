@@ -1,5 +1,6 @@
-import { scanLibrary } from "./filesystem.js";
-import { readMetadata } from "./metadata.js";
+import { findSiblingFile, getTrackFile, scanLibrary } from "./filesystem.js";
+import { readLyrics, readMetadata } from "./metadata.js";
+import { activeLyricIndex, decodeText, parseLyrics } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
@@ -9,7 +10,7 @@ import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, par
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -224,7 +225,111 @@ function renderPlayback() {
   }
   if (player.path !== scrolledPath) scrollToPlayingRow();
   renderPlaylistStats();
+  if (currentView === "lyrics") renderLyrics();
 }
+
+// Lyrics of the playing track, read from the file on demand and cached per path.
+const lyricsCache = new Map();
+let lyricsShown = null;
+let lyricsActive = -1;
+let lyricsUserScrolledAt = 0;
+
+async function loadLyrics(path) {
+  lyricsCache.set(path, { status: "loading" });
+  let entry;
+  // Embedded lyrics win; otherwise a same-named .txt next to the MP3 is used.
+  let text = "";
+  let source = "Embedded";
+  let failed = false;
+  try {
+    text = await readLyrics(await getTrackFile(library.handle, path));
+  } catch (error) {
+    console.error("Could not read embedded lyrics:", error);
+    failed = true;
+  }
+  if (!text.trim()) {
+    try {
+      const sidecar = await findSiblingFile(library.handle, path, ".txt");
+      if (sidecar) {
+        text = decodeText(await sidecar.arrayBuffer());
+        source = sidecar.name;
+      }
+    } catch (error) {
+      console.error("Could not read lyrics file:", error);
+      failed = true;
+    }
+  }
+  const parsed = parseLyrics(text);
+  entry = parsed.lines.length ? { status: "ready", source, ...parsed } : { status: failed ? "error" : "none" };
+  if (!library || lyricsCache.get(path)?.status !== "loading") return;
+  lyricsCache.set(path, entry);
+  if (currentView === "lyrics" && player.path === path) renderLyrics();
+}
+
+function renderLyrics() {
+  const path = player.path;
+  const track = path && trackFor(path);
+  const meta = track ? [track.title || path, track.artist || "Unknown artist"] : path ? [path] : [];
+  const source = path && lyricsCache.get(path)?.source;
+  if (source) meta.push(source);
+  const metaKey = meta.join("\n");
+  if (elements["lyrics-meta"].dataset.key !== metaKey) {
+    elements["lyrics-meta"].dataset.key = metaKey;
+    renderMeta(elements["lyrics-meta"], meta);
+  }
+  if (path && library && !lyricsCache.has(path)) loadLyrics(path);
+  const entry = path ? lyricsCache.get(path) : null;
+  if (entry !== lyricsShown) {
+    lyricsShown = entry;
+    lyricsActive = -1;
+    const lines = entry?.status === "ready" ? entry.lines : [];
+    elements["lyrics-lines"].replaceChildren(...lines.map(line => {
+      const row = document.createElement("p");
+      row.textContent = line.text || "\u00a0";
+      if (entry.synced) {
+        row.dataset.time = line.time;
+        row.className = "-mx-2 cursor-pointer rounded-md px-2 py-1 text-[#8a999e] transition-colors duration-200 hover:bg-[#f1f6f4] hover:text-[#5d7079]";
+      } else {
+        row.className = "text-[#273b44]";
+      }
+      return row;
+    }));
+    elements["lyrics-lines"].scrollTop = 0;
+    const message = !path ? "Play a track to see its lyrics."
+      : !entry || entry.status === "loading" ? "Loading lyrics…"
+      : entry.status === "none" ? "No lyrics in this file or a matching .txt file."
+      : entry.status === "error" ? "Couldn't read lyrics from this file."
+      : "";
+    elements["lyrics-empty"].textContent = message;
+    elements["lyrics-empty"].classList.toggle("hidden", !message);
+  }
+  if (entry?.status === "ready" && entry.synced) highlightLyric(entry.lines);
+}
+
+// Highlights the synced line being sung and keeps it centred, unless the user scrolled the lyrics recently.
+function highlightLyric(lines) {
+  const index = activeLyricIndex(lines, (player.audio.currentTime || 0) + 0.2);
+  if (index === lyricsActive) return;
+  const rows = elements["lyrics-lines"].children;
+  rows[lyricsActive]?.classList.remove("!text-[#284f48]", "font-semibold");
+  lyricsActive = index;
+  const row = rows[index];
+  if (!row) return;
+  row.classList.add("!text-[#284f48]", "font-semibold");
+  if (Date.now() - lyricsUserScrolledAt < 4000) return;
+  const scroller = elements["lyrics-lines"];
+  const view = scroller.getBoundingClientRect();
+  const bounds = row.getBoundingClientRect();
+  scroller.scrollTo({ top: scroller.scrollTop + bounds.top - view.top - (view.height - bounds.height) / 2, behavior: "smooth" });
+}
+
+elements["lyrics-lines"].addEventListener("click", event => {
+  const row = event.target.closest("[data-time]");
+  if (!row || !player.path) return;
+  player.audio.currentTime = Number(row.dataset.time);
+  lyricsUserScrolledAt = 0;
+});
+for (const type of ["wheel", "touchmove"]) elements["lyrics-lines"].addEventListener(type, () => { lyricsUserScrolledAt = Date.now(); }, { passive: true });
 
 // Track count and duration for the whole playlist, or the part before/after the playing track (which itself is excluded).
 let playlistStats = "total";
@@ -492,7 +597,7 @@ function renderAnalysis() {
 function render() {
   syncHash();
   hideContextMenu();
-  for (const view of ["library", "playlists", "analysis", "visualizer"]) {
+  for (const view of ["library", "playlists", "analysis", "visualizer", "lyrics"]) {
     const active = currentView === view;
     const nav = elements[`nav-${view}`];
     const panel = elements[`${view}-view`];
@@ -501,7 +606,7 @@ function render() {
     nav.classList.toggle("text-[#284f48]", active);
     nav.classList.toggle("font-medium", !active);
     nav.classList.toggle("text-[#273b44]", !active);
-    if (active && (view === "analysis" || view === "visualizer" || (view === "playlists" && !selectedPlaylistId))) nav.setAttribute("aria-current", "page");
+    if (active && (view === "analysis" || view === "visualizer" || view === "lyrics" || (view === "playlists" && !selectedPlaylistId))) nav.setAttribute("aria-current", "page");
     else nav.removeAttribute("aria-current");
     panel.classList.toggle("hidden", !active);
     panel.classList.toggle("flex", active);
@@ -509,6 +614,7 @@ function render() {
   if (currentView === "analysis") renderAnalysis();
   if (currentView === "visualizer") visualizer.start();
   else visualizer.stop();
+  if (currentView === "lyrics") renderLyrics();
   for (const mode of ["artist", "album", "track"]) {
     const nav = elements[`nav-${mode}`];
     const active = currentView === "library" && libraryMode === mode;
@@ -1397,6 +1503,7 @@ async function runScan(handle) {
       artistAlbum = null;
     }
     library = next;
+    lyricsCache.clear();
     permission = "granted";
     await refreshSelectedPlaylistMatch();
     const trackCount = tracks.length.toLocaleString();
@@ -1609,6 +1716,7 @@ for (const mode of ["artist", "album", "track"]) {
 elements["nav-playlists"].addEventListener("click", () => { currentView = "playlists"; selectedPlaylistId = null; render(); });
 elements["nav-analysis"].addEventListener("click", () => { currentView = "analysis"; render(); });
 elements["nav-visualizer"].addEventListener("click", () => { currentView = "visualizer"; render(); });
+elements["nav-lyrics"].addEventListener("click", () => { currentView = "lyrics"; render(); });
 for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => { if (currentView === "visualizer") visualizer.connect(); });
 
 // While music plays, switch to the visualizer after a stretch without user input.
@@ -1618,7 +1726,8 @@ function scheduleIdleVisualizer() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     const typing = document.activeElement?.matches("input:not([type=range]), textarea");
-    if (!player.path || player.audio.paused || currentView === "visualizer" || typing || document.hidden) return;
+    // Lyrics are being read along, so stay there.
+    if (!player.path || player.audio.paused || currentView === "visualizer" || currentView === "lyrics" || typing || document.hidden) return;
     currentView = "visualizer";
     render();
   }, IDLE_VISUALIZER_MS);
@@ -1847,6 +1956,7 @@ let historyReady = false;
 function routeHash() {
   const encode = value => encodeURIComponent(value);
   if (currentView === "visualizer") return "#/visualizer";
+  if (currentView === "lyrics") return "#/lyrics";
   if (currentView === "analysis") {
     if (analysisYear !== null) return `#/analysis/${analysisMetric}/${analysisYear}`;
     return analysisMetric === "albums" ? "#/analysis" : `#/analysis/${analysisMetric}`;
@@ -1880,6 +1990,10 @@ function applyRoute() {
   const [name, group, album] = parts;
   if (name === "visualizer") {
     currentView = "visualizer";
+    return;
+  }
+  if (name === "lyrics") {
+    currentView = "lyrics";
     return;
   }
   if (name === "analysis") {

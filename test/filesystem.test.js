@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getTrackFile, scanLibrary } from "../src/filesystem.js";
+import { findSiblingFile, getTrackFile, scanLibrary } from "../src/filesystem.js";
 
 function file(name, overrides = {}) {
   return { kind: "file", getFile: async () => ({ name, size: 12, lastModified: 1, ...overrides }) };
@@ -63,4 +63,15 @@ test("resolves a playlist path through subfolders to the original file", async (
     return album;
   } };
   assert.equal(await getTrackFile(root, "Album/song.mp3"), original);
+});
+
+test("finds a same-named sibling file case-insensitively, in nested folders", async () => {
+  const nested = directory([["Song.MP3", file("Song.MP3")], ["song.TXT", file("song.TXT")], ["other.txt", file("other.txt")]]);
+  const root = directory([["a.mp3", file("a.mp3")], ["album", nested]]);
+  root.getDirectoryHandle = async name => {
+    if (name !== "album") throw new Error("missing");
+    return nested;
+  };
+  assert.equal((await findSiblingFile(root, "album/Song.MP3", ".txt")).name, "song.TXT");
+  assert.equal(await findSiblingFile(root, "a.mp3", ".txt"), null);
 });

@@ -21,6 +21,19 @@ function readTags(file) {
   });
 }
 
+// Embedded lyrics (ID3 USLT frame), or "" when the file has none.
+export function readLyrics(file) {
+  return new Promise((resolve, reject) => {
+    new jsmediatags.Reader(file).setTagsToRead(["lyrics"]).read({
+      onSuccess: ({ tags }) => {
+        const lyrics = tags.lyrics;
+        resolve(typeof lyrics === "string" ? lyrics : typeof lyrics?.lyrics === "string" ? lyrics.lyrics : "");
+      },
+      onError: error => error?.type === "tagFormat" ? resolve("") : reject(new Error(error?.info || "Couldn't read tags."))
+    });
+  });
+}
+
 function readDuration(file) {
   return new Promise(resolve => {
     const audio = new Audio();
