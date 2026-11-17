@@ -1490,6 +1490,21 @@ elements["nav-playlists"].addEventListener("click", () => { currentView = "playl
 elements["nav-analysis"].addEventListener("click", () => { currentView = "analysis"; render(); });
 elements["nav-visualizer"].addEventListener("click", () => { currentView = "visualizer"; render(); });
 for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => { if (currentView === "visualizer") visualizer.connect(); });
+
+// While music plays, switch to the visualizer after a stretch without user input.
+const IDLE_VISUALIZER_MS = 30_000;
+let idleTimer = null;
+function scheduleIdleVisualizer() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    const typing = document.activeElement?.matches("input:not([type=range]), textarea");
+    if (!player.path || player.audio.paused || currentView === "visualizer" || typing || document.hidden) return;
+    currentView = "visualizer";
+    render();
+  }, IDLE_VISUALIZER_MS);
+}
+for (const type of ["pointermove", "pointerdown", "keydown", "wheel", "touchstart"]) document.addEventListener(type, scheduleIdleVisualizer, { passive: true });
+player.audio.addEventListener("play", scheduleIdleVisualizer);
 for (const metric of ["albums", "tracks"]) {
   elements[`analysis-${metric}`].addEventListener("click", () => {
     analysisMetric = metric;
