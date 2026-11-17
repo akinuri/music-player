@@ -4,6 +4,7 @@ import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedP
 import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
+import { initTooltips } from "./tooltips.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, parsePlaylists, PlaylistFileError, playlistMatchesLibrary, serializePlaylists } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
@@ -1914,4 +1915,5 @@ async function init() {
   restoreSession();
 }
 
+initTooltips();
 init();

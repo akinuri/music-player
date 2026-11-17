@@ -8,7 +8,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "jsmediatags": "^3.9.7"
+    "jsmediatags": "^3.9.7",
+    "tippy.js": "^6.3.7"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
