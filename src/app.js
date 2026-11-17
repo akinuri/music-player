@@ -751,10 +751,10 @@ function render() {
   if (!selected) {
     const exportAll = button("export", "Export all playlists", () => exportPlaylists(savedPlaylists, "playlists"), busy || !savedPlaylists.length);
     exportAll.title = "Export all playlists";
-    elements["saved-actions"].append(
-      button("import", "Import playlists", () => elements["import-file"].click(), busy || !library),
-      exportAll
-    );
+    const importButton = button("import", "Import playlists", () => elements["import-file"].click(), busy || !library);
+    importButton.dataset.drop = "playlists";
+    importButton.classList.add("origin-center", "transition-transform", "duration-150");
+    elements["saved-actions"].append(importButton, exportAll);
   }
   if (selected) {
     elements["saved-actions"].append(
@@ -1454,20 +1454,54 @@ const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]
 // Extra emphasis while the drag is over the button itself, i.e. a drop would land.
 const dropHover = ["!border-solid", "!bg-[#d3e6dc]", "!text-[#284f48]", "ring-4", "ring-[#315e55]/20"];
 
-function setDropState(active) {
-  const target = elements["choose-folder"];
-  target.classList.toggle("relative", active);
-  target.classList.toggle("z-10", active);
-  for (const name of dropActive) target.classList.toggle(name, active);
-  if (!active) setDropHover(false);
-}
-
-function setDropHover(active) {
-  for (const name of dropHover) elements["choose-folder"].classList.toggle(name, active);
-}
-
 const dragHasFiles = event => [...(event.dataTransfer?.types || [])].includes("Files");
 const canDropFolder = () => !busy && "showDirectoryPicker" in window && "getAsFileSystemHandle" in DataTransferItem.prototype;
+
+async function dropFolder(dataTransfer) {
+  try {
+    const handles = await Promise.all([...dataTransfer.items].filter(item => item.kind === "file").map(item => item.getAsFileSystemHandle()));
+    const folder = handles.find(handle => handle?.kind === "directory");
+    if (!folder) notice("Drop a folder, not files.", true);
+    else await runScan(folder);
+  } catch (error) {
+    console.error("Folder drop failed:", error);
+    notice("Couldn't open that folder. Check browser permissions and try again.", true);
+  }
+}
+
+function dropPlaylistFiles(dataTransfer) {
+  const files = [...dataTransfer.files].filter(file => file.type === "application/json" || /.json$/i.test(file.name));
+  if (!files.length) notice("Drop playlist .json files.", true);
+  else importPlaylists(files);
+}
+
+// Buttons that accept dropped files. The import button is re-created on render, so targets are looked up on demand.
+const dropTargets = [
+  { element: () => elements["choose-folder"], enabled: canDropFolder, drop: dropFolder },
+  // The playlists card clips its contents (rounded corners), which would cut off the enlarged button, so unclip it while dragging.
+  { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy && !!library, drop: dropPlaylistFiles, unclip: node => node.closest("section") }
+];
+
+function activeDropTargets() {
+  return dropTargets.map(target => ({ ...target, node: target.element() })).filter(target => target.node?.offsetParent && target.enabled());
+}
+
+function dropTargetAt(event) {
+  return activeDropTargets().find(target => target.node.contains(event.target));
+}
+
+function setDropState(active, hovered = null) {
+  for (const target of dropTargets) {
+    const node = target.element();
+    if (!node) continue;
+    const on = active && !!node.offsetParent && target.enabled();
+    node.classList.toggle("relative", on);
+    node.classList.toggle("z-10", on);
+    for (const name of dropActive) node.classList.toggle(name, on);
+    for (const name of dropHover) node.classList.toggle(name, on && node === hovered);
+    target.unclip?.(node)?.classList.toggle("!overflow-visible", on);
+  }
+}
 
 // dragenter/dragleave fire for every element crossed, so a depth count (not relatedTarget) tells when the drag really leaves the window.
 let dragDepth = 0;
@@ -1475,14 +1509,14 @@ let dragDepth = 0;
 document.addEventListener("dragenter", event => {
   if (!dragHasFiles(event)) return;
   dragDepth++;
-  if (canDropFolder()) setDropState(true);
+  setDropState(true);
 });
 document.addEventListener("dragover", event => {
   if (!dragHasFiles(event)) return;
   event.preventDefault();
-  const overButton = canDropFolder() && elements["choose-folder"].contains(event.target);
-  event.dataTransfer.dropEffect = overButton ? "copy" : "none";
-  setDropHover(overButton);
+  const target = dropTargetAt(event);
+  event.dataTransfer.dropEffect = target ? "copy" : "none";
+  setDropState(true, target?.node);
 });
 document.addEventListener("dragleave", event => {
   if (!dragHasFiles(event)) return;
@@ -1493,17 +1527,9 @@ document.addEventListener("drop", async event => {
   if (!dragHasFiles(event)) return;
   event.preventDefault();
   dragDepth = 0;
+  const target = dropTargetAt(event);
   setDropState(false);
-  if (!canDropFolder() || !elements["choose-folder"].contains(event.target)) return;
-  try {
-    const handles = await Promise.all([...event.dataTransfer.items].filter(item => item.kind === "file").map(item => item.getAsFileSystemHandle()));
-    const folder = handles.find(handle => handle?.kind === "directory");
-    if (!folder) notice("Drop a folder, not files.", true);
-    else await runScan(folder);
-  } catch (error) {
-    console.error("Folder drop failed:", error);
-    notice("Couldn't open that folder. Check browser permissions and try again.", true);
-  }
+  if (target) await target.drop(event.dataTransfer);
 });
 document.addEventListener("dragend", () => {
   dragDepth = 0;
