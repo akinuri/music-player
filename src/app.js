@@ -1717,6 +1717,16 @@ elements["nav-playlists"].addEventListener("click", () => { currentView = "playl
 elements["nav-analysis"].addEventListener("click", () => { currentView = "analysis"; render(); });
 elements["nav-visualizer"].addEventListener("click", () => { currentView = "visualizer"; render(); });
 elements["nav-lyrics"].addEventListener("click", () => { currentView = "lyrics"; render(); });
+// The year chart only scrolls sideways, so a vertical wheel scrolls it horizontally (until it reaches an end).
+elements["analysis-chart"].addEventListener("wheel", event => {
+  const chart = elements["analysis-chart"];
+  if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY) || chart.scrollWidth <= chart.clientWidth) return;
+  const max = chart.scrollWidth - chart.clientWidth;
+  if ((event.deltaY < 0 && chart.scrollLeft <= 0) || (event.deltaY > 0 && chart.scrollLeft >= max - 1)) return;
+  event.preventDefault();
+  const step = event.deltaMode === 1 ? event.deltaY * 40 : event.deltaMode === 2 ? event.deltaY * chart.clientWidth : event.deltaY;
+  chart.scrollLeft += step;
+}, { passive: false });
 for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => { if (currentView === "visualizer") visualizer.connect(); });
 
 // While music plays, switch to the visualizer after a stretch without user input.
