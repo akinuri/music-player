@@ -23,7 +23,9 @@ let sortKey = "title";
 let sortDirection = "ascending";
 let currentAlbumView = null;
 let sortBeforeAlbum = null;
-const groupSort = { artist: { key: "name", direction: "ascending" }, album: { key: "name", direction: "ascending" } };
+// Sort per grouped list: all artists, all albums, and one artist's albums (chronological by default, like a discography).
+const groupSortDefaults = { artist: "name", album: "name", artistAlbum: "year" };
+const groupSort = Object.fromEntries(Object.entries(groupSortDefaults).map(([slot, key]) => [slot, { key, direction: "ascending" }]));
 let selectedPlaylistId = null;
 let renamingId = null;
 let analysisMetric = "albums";
@@ -683,8 +685,9 @@ function render() {
   const grouped = libraryMode !== "track" && (libraryGroup === null || (artistAlbums && artistAlbum === null));
   const groupMode = artistAlbums ? "album" : libraryMode;
   const groupName = (value, mode) => value || (mode === "artist" ? "Unknown artist" : "Unknown album");
-  if (groupMode === "album" && artistAlbums && groupSort.album.key === "artist") groupSort.album = { key: "name", direction: "ascending" };
-  const groups = grouped ? sortLibraryGroups(groupLibraryTracks(filtered, groupMode), groupMode, groupSort[groupMode].key, groupSort[groupMode].direction) : [];
+  const sortSlot = artistAlbums ? "artistAlbum" : groupMode;
+  if (artistAlbums && groupSort.artistAlbum.key === "artist") groupSort.artistAlbum = { key: groupSortDefaults.artistAlbum, direction: "ascending" };
+  const groups = grouped ? sortLibraryGroups(groupLibraryTracks(filtered, groupMode), groupMode, groupSort[sortSlot].key, groupSort[sortSlot].direction) : [];
   elements["library-title"].replaceChildren();
   const scoped = filterLibraryTracks(tracks, libraryMode, libraryGroup, artistAlbum, "");
   const albumLabel = name => {
@@ -726,8 +729,8 @@ function render() {
   elements["group-name-heading"].textContent = groupMode === "artist" ? "Artist" : "Album";
   for (const sortButton of [...sortButtons, ...groupSortButtons]) {
     const isGroup = "groupSort" in sortButton.dataset;
-    const key = isGroup ? groupSort[groupMode]?.key : sortKey;
-    const direction = isGroup ? groupSort[groupMode]?.direction : sortDirection;
+    const key = isGroup ? groupSort[sortSlot]?.key : sortKey;
+    const direction = isGroup ? groupSort[sortSlot]?.direction : sortDirection;
     const active = (isGroup ? sortButton.dataset.groupSort : sortButton.dataset.sort) === key;
     const heading = sortButton.closest("th");
     if (active) heading.setAttribute("aria-sort", direction);
@@ -1697,8 +1700,7 @@ for (const sortButton of sortButtons) {
 }
 for (const sortButton of groupSortButtons) {
   sortButton.addEventListener("click", () => {
-    const mode = libraryMode === "artist" && libraryGroup === null ? "artist" : "album";
-    const state = groupSort[mode];
+    const state = groupSort[libraryShape().sortSlot];
     const key = sortButton.dataset.groupSort;
     state.direction = key === state.key && state.direction === "ascending" ? "descending" : "ascending";
     state.key = key;
@@ -1976,14 +1978,14 @@ function libraryShape() {
   const artistAlbums = libraryMode === "artist" && libraryGroup !== null;
   const grouped = libraryMode !== "track" && (libraryGroup === null || (artistAlbums && artistAlbum === null));
   const albumTracks = (libraryMode === "artist" && artistAlbum !== null) || (libraryMode === "album" && libraryGroup !== null);
-  return { grouped, groupMode: artistAlbums ? "album" : libraryMode, trackDefault: albumTracks ? "trackNumber" : "title" };
+  return { grouped, groupMode: artistAlbums ? "album" : libraryMode, sortSlot: artistAlbums ? "artistAlbum" : libraryMode, trackDefault: albumTracks ? "trackNumber" : "title" };
 }
 
 // "?sort=key&order=desc" for the visible list, or "" when it uses its default sort.
 function sortQuery() {
   const shape = libraryShape();
-  const { key, direction } = shape.grouped ? groupSort[shape.groupMode] : { key: sortKey, direction: sortDirection };
-  const defaultKey = shape.grouped ? "name" : shape.trackDefault;
+  const { key, direction } = shape.grouped ? groupSort[shape.sortSlot] : { key: sortKey, direction: sortDirection };
+  const defaultKey = shape.grouped ? groupSortDefaults[shape.sortSlot] : shape.trackDefault;
   if (key === defaultKey && direction === "ascending") return "";
   const params = new URLSearchParams({ sort: key });
   if (direction === "descending") params.set("order", "desc");
@@ -1996,8 +1998,8 @@ function applySortQuery(query) {
   const direction = params.get("order") === "desc" ? "descending" : "ascending";
   const shape = libraryShape();
   if (shape.grouped) {
-    const valid = groupSortKeys.has(key) && !(shape.groupMode === "album" && libraryMode === "artist" && key === "artist");
-    groupSort[shape.groupMode] = valid ? { key, direction } : { key: "name", direction: "ascending" };
+    const valid = groupSortKeys.has(key) && !(shape.sortSlot === "artistAlbum" && key === "artist");
+    groupSort[shape.sortSlot] = valid ? { key, direction } : { key: groupSortDefaults[shape.sortSlot], direction: "ascending" };
   } else {
     routeTrackSort = trackSortKeys.has(key) ? { key, direction } : "default";
   }
