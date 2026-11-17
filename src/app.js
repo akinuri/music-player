@@ -1477,9 +1477,9 @@ function dropPlaylistFiles(dataTransfer) {
 
 // Buttons that accept dropped files. The import button is re-created on render, so targets are looked up on demand.
 const dropTargets = [
-  { element: () => elements["choose-folder"], enabled: canDropFolder, drop: dropFolder },
+  { element: () => elements["choose-folder"], enabled: canDropFolder, drop: dropFolder, text: "Drop folder" },
   // The playlists card clips its contents (rounded corners), which would cut off the enlarged button, so unclip it while dragging.
-  { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy && !!library, drop: dropPlaylistFiles, unclip: node => node.closest("section") }
+  { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy && !!library, drop: dropPlaylistFiles, text: "Drop playlists (.json)", unclip: node => node.closest("section") }
 ];
 
 function activeDropTargets() {
@@ -1488,6 +1488,26 @@ function activeDropTargets() {
 
 function dropTargetAt(event) {
   return activeDropTargets().find(target => target.node.contains(event.target));
+}
+
+// A caption under each drop target saying what it accepts. Fixed to the page so card clipping can't hide it.
+function placeDropLabel(target, node, hovered) {
+  if (!node) {
+    target.label?.classList.add("hidden");
+    return;
+  }
+  if (!target.label) {
+    target.label = document.createElement("div");
+    target.label.setAttribute("aria-hidden", "true");
+    target.label.textContent = target.text;
+    document.body.append(target.label);
+  }
+  const label = target.label;
+  label.className = `pointer-events-none fixed z-50 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium shadow-sm transition-colors ${hovered ? "bg-[#315e55] text-white" : "border border-[#c9dfd3] bg-[#f2f8ee] text-[#284f48]"}`;
+  const bounds = node.getBoundingClientRect();
+  const left = bounds.left + bounds.width / 2 - label.offsetWidth / 2;
+  label.style.left = `${Math.max(4, Math.min(left, window.innerWidth - label.offsetWidth - 4))}px`;
+  label.style.top = `${Math.min(bounds.bottom + 6, window.innerHeight - label.offsetHeight - 4)}px`;
 }
 
 function setDropState(active, hovered = null) {
@@ -1500,6 +1520,7 @@ function setDropState(active, hovered = null) {
     for (const name of dropActive) node.classList.toggle(name, on);
     for (const name of dropHover) node.classList.toggle(name, on && node === hovered);
     target.unclip?.(node)?.classList.toggle("!overflow-visible", on);
+    placeDropLabel(target, on && node, node === hovered);
   }
 }
 
