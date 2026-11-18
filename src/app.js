@@ -12,7 +12,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -255,6 +255,128 @@ function renderPlayback() {
   renderPlaylistStats();
   if (currentView === "lyrics") renderLyrics();
 }
+
+// Library filter by source: null shows every source, a set shows exactly those (possibly none). Remembered per browser.
+let sourceFilter = null;
+try {
+  const stored = JSON.parse(localStorage.getItem("sourceFilter"));
+  // Older versions stored a plain array where empty meant "all".
+  if (Array.isArray(stored)) sourceFilter = stored.length ? new Set(stored) : null;
+  else if (Array.isArray(stored?.selected)) sourceFilter = new Set(stored.selected);
+} catch {}
+
+// The effective selection, or null when everything is shown.
+function activeSourceFilter() {
+  const ids = new Set((library?.sources || []).map(source => source.id));
+  if (!sourceFilter || ids.size < 2) return null;
+  const selected = [...sourceFilter].filter(id => ids.has(id));
+  // Selecting every source is no filter; a selection whose folders were all removed falls back to everything.
+  if (selected.length === ids.size || (!selected.length && sourceFilter.size)) return null;
+  return new Set(selected);
+}
+
+function inSourceFilter(track) {
+  const active = activeSourceFilter();
+  return !active || active.has(splitKey(track.path).sourceId);
+}
+
+function saveSourceFilter() {
+  try { localStorage.setItem("sourceFilter", JSON.stringify(sourceFilter ? { selected: [...sourceFilter] } : null)); } catch {}
+}
+
+function renderSourceFilter() {
+  const sources = library?.sources || [];
+  const button = elements["source-filter"];
+  const several = sources.length > 1;
+  button.classList.toggle("hidden", !several);
+  button.classList.toggle("flex", several);
+  // Whichever is first pushes the controls to the right.
+  elements.search.classList.toggle("ml-auto", !several);
+  if (!several) closeSourceFilter();
+  const active = activeSourceFilter();
+  const chosen = active ? sources.filter(source => active.has(source.id)) : [];
+  elements["source-filter-label"].textContent = !active ? "All sources" : !chosen.length ? "No sources" : chosen.length === 1 ? chosen[0].name : `${chosen.length} sources`;
+  button.toggleAttribute("data-filtered", !!active);
+  button.setAttribute("aria-label", `Sources: ${!active ? "all" : chosen.map(source => source.name).join(", ") || "none"}`);
+  const menu = elements["source-filter-menu"];
+  const option = (label, checked, onChange, extraClass = "") => {
+    const row = document.createElement("label");
+    row.className = `flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-tint ${extraClass}`;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = checked;
+    input.className = "h-4 w-4 shrink-0 accent-primary";
+    input.addEventListener("change", onChange);
+    const text = document.createElement("span");
+    text.className = "min-w-0 truncate";
+    text.textContent = label;
+    text.title = label;
+    row.append(input, text);
+    return row;
+  };
+  const focused = menu.contains(document.activeElement) ? [...menu.querySelectorAll("input")].indexOf(document.activeElement) : -1;
+  menu.replaceChildren(
+    // Toggles between everything and nothing; shown as mixed when only some sources are selected.
+    option("All sources", !active, event => {
+      sourceFilter = event.target.checked ? null : new Set();
+      saveSourceFilter();
+      render();
+    }, "border-b border-bd-2 font-medium"),
+    ...sources.map(source => option(source.name, !active || active.has(source.id), event => {
+      const next = new Set(active || sources.map(item => item.id));
+      if (event.target.checked) next.add(source.id);
+      else next.delete(source.id);
+      sourceFilter = next.size < sources.length ? next : null;
+      saveSourceFilter();
+      render();
+    }))
+  );
+  menu.querySelector("input").indeterminate = !!active && chosen.length > 0;
+  // The menu is rebuilt on every render; keep keyboard focus on the same checkbox.
+  if (focused >= 0) menu.querySelectorAll("input")[focused]?.focus();
+}
+
+function openSourceFilter() {
+  const menu = elements["source-filter-menu"];
+  const button = elements["source-filter"];
+  menu.classList.remove("hidden");
+  const bounds = button.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(bounds.left, window.innerWidth - menu.offsetWidth - 4))}px`;
+  const below = bounds.bottom + 4;
+  menu.style.top = `${below + menu.offsetHeight > window.innerHeight - 4 ? Math.max(4, bounds.top - menu.offsetHeight - 4) : below}px`;
+  button.setAttribute("aria-expanded", "true");
+}
+
+function closeSourceFilter() {
+  elements["source-filter-menu"].classList.add("hidden");
+  elements["source-filter"].setAttribute("aria-expanded", "false");
+}
+
+elements["source-filter"].addEventListener("click", () => {
+  if (elements["source-filter-menu"].classList.contains("hidden")) {
+    openSourceFilter();
+    elements["source-filter-menu"].querySelector("input")?.focus();
+  } else closeSourceFilter();
+});
+document.addEventListener("pointerdown", event => {
+  if (!event.target.closest("#source-filter, #source-filter-menu")) closeSourceFilter();
+});
+elements["source-filter-menu"].addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    event.stopPropagation();
+    closeSourceFilter();
+    elements["source-filter"].focus();
+  }
+});
+// Tabbing away closes the menu. (Focus lost to a re-render has no relatedTarget and is restored by renderSourceFilter.)
+elements["source-filter-menu"].addEventListener("focusout", event => {
+  const next = event.relatedTarget;
+  if (next && !event.currentTarget.contains(next) && next !== elements["source-filter"]) closeSourceFilter();
+});
+window.addEventListener("resize", closeSourceFilter);
+document.addEventListener("scroll", event => {
+  if (!elements["source-filter-menu"].contains(event.target)) closeSourceFilter();
+}, true);
 
 // Sources card: one row per folder with its own reconnect/rescan/remove, plus "all" actions when there are several.
 function sourceButton(icon, label, action, { disabled = false, primary = false } = {}) {
@@ -732,7 +854,8 @@ function render() {
     elements["playlist-nav-items"].append(nav);
     if (saved.id === focusedPlaylist) nav.focus();
   }
-  const tracks = library?.tracks || [];
+  const tracks = (library?.tracks || []).filter(inSourceFilter);
+  renderSourceFilter();
   elements["artist-nav-count"].textContent = new Set(tracks.map(track => groupKey(track, "artist"))).size.toLocaleString();
   elements["album-nav-count"].textContent = new Set(tracks.map(track => groupKey(track, "album"))).size.toLocaleString();
   elements["track-nav-count"].textContent = tracks.length.toLocaleString();
@@ -909,8 +1032,9 @@ function render() {
     elements["track-rows"].append(row);
   });
   elements.empty.classList.toggle("hidden", filtered.length > 0);
-  elements["empty-title"].textContent = query ? "No tracks found" : library ? "No MP3 files found" : "No folder selected";
-  elements["empty-description"].textContent = query ? "Try a different search term." : library ? "Add MP3 files to your folder and rescan to see them here." : "Choose a folder to index your MP3 files. Files are not uploaded.";
+  const noSources = activeSourceFilter()?.size === 0;
+  elements["empty-title"].textContent = noSources ? "No sources selected" : query ? "No tracks found" : library ? "No MP3 files found" : "No folder selected";
+  elements["empty-description"].textContent = noSources ? "Pick sources in the filter to see their tracks." : query ? "Try a different search term." : library ? "Add MP3 files to your folder and rescan to see them here." : "Choose a folder to index your MP3 files. Files are not uploaded.";
   const paths = playlistPaths();
   elements["playlist-nav-count"].textContent = savedPlaylists.length.toLocaleString();
   const selected = savedPlaylists.find(saved => saved.id === selectedPlaylistId);

@@ -101,7 +101,9 @@
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
               <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
               <div id="library-meta" class="flex flex-wrap gap-2 text-sm"></div>
-              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="ml-auto min-w-[10rem] flex-1 rounded-md border border-bd-in bg-field px-3 py-1.5 text-base outline-none placeholder:text-faint focus:border-primary focus:bg-surface sm:max-w-xs">
+              <button id="source-filter" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="source-filter-menu" title="Filter by source" class="group ml-auto hidden h-[34px] max-w-[14rem] shrink-0 items-center gap-1.5 rounded-md border border-bd-in bg-field pl-2.5 pr-1.5 text-sm text-fg-2 hover:bg-tint-2 aria-expanded:border-primary data-[filtered]:border-bd-acc data-[filtered]:bg-accent-soft data-[filtered]:text-deep"><svg aria-hidden="true" class="h-4 w-4 shrink-0"><use href="#icon-folder"></use></svg><span id="source-filter-label" class="truncate">All sources</span><svg aria-hidden="true" class="h-4 w-4 shrink-0 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
+              <div id="source-filter-menu" role="group" aria-label="Sources to show" class="fixed z-50 hidden max-h-80 min-w-[12rem] max-w-[20rem] overflow-y-auto rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg"></div>
+              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="min-w-[10rem] flex-1 rounded-md border border-bd-in bg-field px-3 py-1.5 text-base outline-none placeholder:text-faint focus:border-primary focus:bg-surface sm:max-w-xs">
             </div>
           </div>
           <div class="max-h-80 overflow-auto lg:max-h-none lg:flex-1">
