@@ -32,7 +32,21 @@ function attach(element) {
   });
 }
 
+// When code sets `title` again on an element that already has a tooltip (e.g. the volume slider while scrolling),
+// take the new text right away so an open tooltip updates live and the native one never shows.
+function watchTitles(root) {
+  new MutationObserver(mutations => {
+    for (const { target } of mutations) {
+      if (!target._tippy || !target.hasAttribute("title")) continue;
+      const text = adoptTitle(target);
+      if (text) target._tippy.setContent(text);
+      else target._tippy.hide();
+    }
+  }).observe(root, { attributes: true, attributeFilter: ["title"], subtree: true });
+}
+
 export function initTooltips(root = document) {
+  watchTitles(root);
   for (const type of ["pointerover", "focusin"]) {
     root.addEventListener(type, event => {
       const element = event.target.closest?.("[title], [data-tip]");
