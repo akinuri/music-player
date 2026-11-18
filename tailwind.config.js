@@ -43,8 +43,9 @@ export default {
       },
       keyframes: {
         attention: {
-          "0%": { boxShadow: "0 0 0 0 rgb(49 94 85 / 0.45)" },
-          "70%, 100%": { boxShadow: "0 0 0 10px rgb(49 94 85 / 0)" }
+          // Theme color, so it reads in dark mode too.
+          "0%": { boxShadow: "0 0 0 0 rgb(var(--c-primary) / 0.7)" },
+          "70%, 100%": { boxShadow: "0 0 0 12px rgb(var(--c-primary) / 0)" }
         }
       },
       animation: {
