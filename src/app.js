@@ -476,7 +476,7 @@ function renderAnalysis() {
     if (value) {
       const height = (value / peak) * 82;
       const bar = document.createElement("div");
-      bar.className = `absolute bottom-0 left-1/2 w-5 -translate-x-1/2 rounded-t ${isSelected ? "bg-primary" : "bg-primary-light"}`;
+      bar.className = `absolute bottom-0 left-1/2 w-5 -translate-x-1/2 rounded-t ${isSelected ? "bg-bar-sel" : "bg-bar"}`;
       bar.style.height = `${height}%`;
       const label = document.createElement("span");
       label.className = "absolute inset-x-0 text-center text-xs tabular-nums text-soft";

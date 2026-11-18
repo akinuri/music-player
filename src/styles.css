@@ -22,7 +22,8 @@
   --c-accent-soft-2: 194 222 208;
   --c-primary: 49 94 85;
   --c-primary-dark: 40 79 72;
-  --c-primary-light: 143 184 166;
+  --c-bar: 143 184 166;
+  --c-bar-sel: 49 94 85;
   --c-danger: 140 74 54;
   --c-danger-soft: 255 247 244;
   --c-ok-soft: 242 248 238;
@@ -67,7 +68,8 @@
   --c-accent-soft-2: 51 96 85;
   --c-primary: 63 138 118;
   --c-primary-dark: 47 107 92;
-  --c-primary-light: 75 127 112;
+  --c-bar: 52 92 82;
+  --c-bar-sel: 108 170 148;
   --c-danger: 224 138 108;
   --c-danger-soft: 45 29 25;
   --c-ok-soft: 26 43 36;
