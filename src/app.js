@@ -990,7 +990,7 @@ function itemRow(index, titleText, metaText, timeText, extraClass = "") {
 }
 
 let dragState = null;
-const dropMarks = ["shadow-[inset_0_2px_0_#315e55]", "shadow-[inset_0_-2px_0_#315e55]"];
+const dropMarks = ["shadow-[inset_0_2px_0_rgb(var(--c-primary))]", "shadow-[inset_0_-2px_0_rgb(var(--c-primary))]"];
 
 // Makes a row draggable within its container; move(from, to) receives final indexes.
 function makeReorderable(row, index, container, move) {
