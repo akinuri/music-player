@@ -1,3 +1,5 @@
+import { themeColor } from "./theme.js";
+
 const FFT_SIZE = 2048;
 const MIN_DB = -90;
 const MAX_DB = -10;
@@ -140,8 +142,8 @@ export class Visualizer {
     const yOf = level => plot.top + plot.height * (1 - level);
 
     const gradient = context.createLinearGradient(0, plot.top + plot.height, 0, plot.top);
-    gradient.addColorStop(0, "#315e55");
-    gradient.addColorStop(1, "#7cc3a6");
+    gradient.addColorStop(0, themeColor("viz-a"));
+    gradient.addColorStop(1, themeColor("viz-b"));
     context.fillStyle = gradient;
     const drawBars = levels => levels.forEach((level, i) => {
       const x = xOf(edges[i]);
@@ -156,7 +158,7 @@ export class Visualizer {
     }
     drawBars(this.levels);
 
-    context.fillStyle = "#1f3a33";
+    context.fillStyle = themeColor("viz-peak");
     this.peaks.forEach((peak, i) => {
       if (peak <= 0.01) return;
       const x = xOf(edges[i]);
@@ -169,7 +171,7 @@ export class Visualizer {
   drawHover(context, plot, edges, xOf, yOf) {
     context.textAlign = "left";
     context.textBaseline = "alphabetic";
-    context.fillStyle = "#5d7079";
+    context.fillStyle = themeColor("soft");
     const hover = this.hover;
     const index = hover ? edges.findIndex((edge, i) => i + 1 < edges.length && hover.x >= xOf(edge) && hover.x < xOf(edges[i + 1])) : -1;
     if (index < 0 || hover.y < plot.top || hover.y > plot.top + plot.height) {
@@ -177,10 +179,10 @@ export class Visualizer {
       return;
     }
     const x = xOf(edges[index]);
-    context.fillStyle = "rgba(49, 94, 85, 0.12)";
+    context.fillStyle = themeColor("primary", 0.12);
     context.fillRect(x, plot.top, Math.max(1, xOf(edges[index + 1]) - x - 1), plot.height);
     const reading = level => (level <= 0.002 ? "silent" : String(Math.round(level * (MAX_DB - MIN_DB))));
-    context.fillStyle = "#273b44";
+    context.fillStyle = themeColor("fg-2");
     const shown = this.snapshot ?? this.levels;
     context.fillText(`${formatFrequency(edges[index])} – ${formatFrequency(edges[index + 1])}   loudness ${reading(shown[index])}`, plot.left, plot.top - 9);
   }
