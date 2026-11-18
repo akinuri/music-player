@@ -97,6 +97,71 @@
 }
 }
 
+:root[data-theme="christmas"] {
+  color-scheme: dark;
+  --c-page: 14 20 16;
+  --c-surface: 22 34 26;
+  --c-head: 26 42 31;
+  --c-field: 26 42 31;
+  --c-subtle: 32 50 38;
+  --c-tab: 30 46 35;
+  --c-tint: 28 44 33;
+  --c-tint-2: 34 54 40;
+  --c-sel: 58 30 34;
+  --c-sel-2: 74 36 41;
+  --c-accent-soft: 86 40 46;
+  --c-accent-soft-2: 108 48 55;
+  --c-primary: 190 38 56;
+  --c-primary-dark: 146 28 44;
+  --c-primary-light: 46 125 70;
+  --c-danger: 255 150 130;
+  --c-danger-soft: 52 26 22;
+  --c-ok-soft: 24 46 32;
+  --c-fg: 244 238 226;
+  --c-fg-2: 228 220 205;
+  --c-soft: 176 190 172;
+  --c-faint: 140 158 140;
+  --c-faint-2: 118 136 120;
+  --c-deep: 240 205 110;
+  --c-deep-2: 214 180 90;
+  --c-forest: 245 215 130;
+  --c-on-primary: 255 255 255;
+  --c-bd: 52 78 60;
+  --c-bd-2: 40 60 46;
+  --c-bd-3: 42 62 48;
+  --c-bd-in: 70 100 78;
+  --c-bd-acc: 150 120 50;
+  --c-bd-ok: 47 84 69;
+  --c-bd-danger: 100 52 42;
+  --c-overlay: 255 255 255;
+  --c-tip: 58 30 34;
+  --c-tip-text: 250 240 225;
+  --c-tip-border: 150 120 50;
+  --c-viz-a: 46 125 70;
+  --c-viz-b: 232 195 99;
+  --c-viz-peak: 255 235 170;
+}
+
+/* Keep the title text clear of the hat. */
+:root[data-theme="christmas"] #now-playing,
+:root[data-theme="christmas"] #now-artist {
+  padding-right: 3.5rem;
+}
+
+.xmas-hat {
+  display: none;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.35));
+}
+:root[data-theme="christmas"] /* Keep the title text clear of the hat. */
+:root[data-theme="christmas"] #now-playing,
+:root[data-theme="christmas"] #now-artist {
+  padding-right: 3.5rem;
+}
+
+.xmas-hat {
+  display: block;
+}
+
 .tippy-box[data-theme~="app"] {
   background-color: rgb(var(--c-tip));
   color: rgb(var(--c-tip-text));

@@ -7,10 +7,13 @@ test("resolveTheme follows the system only for the system preference", () => {
   assert.equal(resolveTheme("system", false), "light");
   assert.equal(resolveTheme("light", true), "light");
   assert.equal(resolveTheme("dark", false), "dark");
+  assert.equal(resolveTheme("christmas", false), "christmas");
+  assert.equal(resolveTheme("christmas", true), "christmas");
 });
 
 test("normalizePreference falls back to system for unknown values", () => {
   assert.equal(normalizePreference("dark"), "dark");
+  assert.equal(normalizePreference("christmas"), "christmas");
   assert.equal(normalizePreference("purple"), "system");
   assert.equal(normalizePreference(null), "system");
 });

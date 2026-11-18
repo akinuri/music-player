@@ -1,8 +1,9 @@
-export const THEME_PREFERENCES = ["system", "light", "dark"];
+export const THEME_PREFERENCES = ["system", "light", "dark", "christmas"];
 const STORAGE_KEY = "theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-const META_COLORS = { light: "#e6eaed", dark: "#0f1517" };
+const META_COLORS = { light: "#e6eaed", dark: "#0f1517", christmas: "#0e1410" };
 
+// "christmas" is only ever chosen explicitly; it never comes from the system preference.
 // Anything unknown (or no stored value) means "follow the system".
 export function normalizePreference(value) {
   return THEME_PREFERENCES.includes(value) ? value : "system";
