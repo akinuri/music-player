@@ -2252,9 +2252,11 @@ function setVolumeLevel(level) {
 elements.volume.addEventListener("input", () => setVolumeLevel(Number(elements.volume.value)));
 elements.volume.addEventListener("wheel", event => {
   event.preventDefault();
-  const step = Number(elements.volume.step) || 1;
+  // The wheel moves in steps of 5, landing on multiples of 5 (e.g. 34 → 35 → 40); dragging keeps the slider's finer step.
+  const WHEEL_STEP = 5;
   const current = player.audio.muted ? 0 : Math.round(player.audio.volume * 100);
-  setVolumeLevel(Math.min(100, Math.max(0, current + (event.deltaY < 0 ? step : -step))));
+  const next = event.deltaY < 0 ? Math.floor(current / WHEEL_STEP) * WHEEL_STEP + WHEEL_STEP : Math.ceil(current / WHEEL_STEP) * WHEEL_STEP - WHEEL_STEP;
+  setVolumeLevel(Math.min(100, Math.max(0, next)));
 }, { passive: false });
 elements.mute.addEventListener("click", () => {
   if (player.audio.muted || player.audio.volume === 0) {
