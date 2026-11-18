@@ -20,3 +20,14 @@ test("readPreference reads storage and survives a failing one", () => {
   assert.equal(readPreference({ getItem: () => null }), "system");
   assert.equal(readPreference({ getItem() { throw new Error("denied"); } }), "system");
 });
+
+test("readPreference survives a localStorage global that throws on access", () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new DOMException("denied", "SecurityError"); } });
+  try {
+    assert.equal(readPreference(), "system");
+  } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else delete globalThis.localStorage;
+  }
+});

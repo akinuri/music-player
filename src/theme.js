@@ -14,16 +14,19 @@ export function resolveTheme(preference, prefersDark) {
   return normalized;
 }
 
-export function readPreference(storage = globalThis.localStorage) {
+// Storage is resolved inside the try: merely reading globalThis.localStorage throws when site data is blocked.
+export function readPreference(storage) {
   try {
+    storage ??= globalThis.localStorage;
     return normalizePreference(storage?.getItem(STORAGE_KEY));
   } catch {
     return "system";
   }
 }
 
-function writePreference(preference, storage = globalThis.localStorage) {
+function writePreference(preference, storage) {
   try {
+    storage ??= globalThis.localStorage;
     if (preference === "system") storage.removeItem(STORAGE_KEY);
     else storage.setItem(STORAGE_KEY, preference);
   } catch {
