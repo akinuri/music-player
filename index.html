@@ -74,17 +74,19 @@
             <button id="nav-analysis" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Analysis</span></button>
           </nav>
           <section class="flex shrink-0 flex-col gap-1.5 rounded-xl border border-bd bg-surface px-3 py-3 text-fg-2 shadow-sm" aria-labelledby="sources-heading">
-            <div class="flex items-center justify-between gap-2 pl-1.5">
-              <h2 id="sources-heading" class="text-sm font-semibold text-fg">Sources</h2>
+            <div class="flex items-center justify-between gap-2">
+              <h2 id="sources-heading" class="min-w-0"><button id="sources-toggle" type="button" aria-expanded="true" aria-controls="sources-body" class="group flex min-w-0 items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-sm font-semibold text-fg hover:bg-tint"><svg aria-hidden="true" class="h-4 w-4 shrink-0 text-soft transition-transform group-aria-[expanded=false]:-rotate-90"><use href="#icon-chevron"></use></svg>Sources<span id="sources-count" class="hidden rounded px-1.5 text-xs font-medium"></span></button></h2>
               <button id="choose-folder" type="button" aria-label="Add folder" title="Add folder" class="flex h-8 w-8 origin-center items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 shadow-sm transition-transform duration-150 hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-folder-add"></use></svg></button>
             </div>
             <p id="sources-empty" class="px-1.5 text-sm text-soft">Add a music folder, or drop one on the button.</p>
-            <ul id="sources-list" class="flex flex-col gap-0.5" aria-label="Music folders"></ul>
-            <div id="sources-footer" class="hidden items-center gap-1 border-t border-bd-2 px-1.5 pt-2">
-              <span class="mr-auto text-xs text-soft">All folders</span>
-              <button id="reconnect" type="button" aria-label="Reconnect all folders" title="Reconnect all folders" class="hidden flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 border-primary-dark bg-primary text-on-primary hover:bg-primary-dark"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-reconnect"></use></svg></button>
-              <button id="rescan" type="button" aria-label="Rescan all folders" title="Rescan all folders" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rescan"></use></svg></button>
-              <button id="reset-library" type="button" aria-label="Remove all folders" title="Remove all folders" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg></button>
+            <div id="sources-body" class="flex flex-col gap-1.5">
+              <ul id="sources-list" class="flex flex-col gap-0.5" aria-label="Music folders"></ul>
+              <div id="sources-footer" class="hidden items-center gap-1 border-t border-bd-2 px-1.5 pt-2">
+                <span class="mr-auto text-xs text-soft">All folders</span>
+                <button id="reconnect" type="button" aria-label="Reconnect all folders" title="Reconnect all folders" class="hidden flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 border-primary-dark bg-primary text-on-primary hover:bg-primary-dark"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-reconnect"></use></svg></button>
+                <button id="rescan" type="button" aria-label="Rescan all folders" title="Rescan all folders" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rescan"></use></svg></button>
+                <button id="reset-library" type="button" aria-label="Remove all folders" title="Remove all folders" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg></button>
+              </div>
             </div>
           </section>
           <div class="flex shrink-0 px-1">
