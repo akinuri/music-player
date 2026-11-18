@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizePreference, readPreference, resolveTheme } from "../src/theme.js";
+import { DEFAULT_PREFERENCE, normalizePreference, readPreference, resolveTheme } from "../src/theme.js";
 
 test("resolveTheme follows the system only for the system preference", () => {
   assert.equal(resolveTheme("system", true), "dark");
@@ -14,12 +14,13 @@ test("resolveTheme follows the system only for the system preference", () => {
 test("normalizePreference falls back to system for unknown values", () => {
   assert.equal(normalizePreference("dark"), "dark");
   assert.equal(normalizePreference("christmas"), "christmas");
-  assert.equal(normalizePreference("purple"), "system");
-  assert.equal(normalizePreference(null), "system");
+  assert.equal(normalizePreference("system"), "system");
+  assert.equal(normalizePreference("purple"), DEFAULT_PREFERENCE);
+  assert.equal(normalizePreference(null), DEFAULT_PREFERENCE);
 });
 
 test("readPreference reads storage and survives a failing one", () => {
   assert.equal(readPreference({ getItem: () => "dark" }), "dark");
-  assert.equal(readPreference({ getItem: () => null }), "system");
-  assert.equal(readPreference({ getItem() { throw new Error("denied"); } }), "system");
+  assert.equal(readPreference({ getItem: () => null }), DEFAULT_PREFERENCE);
+  assert.equal(readPreference({ getItem() { throw new Error("denied"); } }), DEFAULT_PREFERENCE);
 });

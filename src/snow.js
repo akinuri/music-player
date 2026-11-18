@@ -1,6 +1,7 @@
 const FLAKE_DENSITY = 1 / 14000; // flakes per px²
 const MAX_FLAKES = 140;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const STORAGE_KEY = "snow";
 
 let canvas = null;
 let context = null;
@@ -89,10 +90,32 @@ function onVisibility() {
   else startLoop();
 }
 
-// Snow only falls in the Christmas theme, and stops if the user turns on reduced motion.
+let enabled = true;
+
+export function snowEnabled() {
+  return enabled;
+}
+
+export function setSnowEnabled(value) {
+  enabled = value;
+  try {
+    localStorage.setItem(STORAGE_KEY, value ? "on" : "off");
+  } catch {
+    // Storage can be unavailable (private mode); the choice then lasts until reload.
+  }
+  document.dispatchEvent(new CustomEvent("snowchange"));
+}
+
+// Snow only falls in the Christmas theme, when the user has not turned it off, and not with reduced motion.
 export function initSnow() {
-  const sync = () => (document.documentElement.dataset.theme === "christmas" ? startSnow() : stopSnow());
+  try {
+    enabled = localStorage.getItem(STORAGE_KEY) !== "off";
+  } catch {
+    enabled = true;
+  }
+  const sync = () => (enabled && document.documentElement.dataset.theme === "christmas" ? startSnow() : stopSnow());
   document.addEventListener("themechange", sync);
+  document.addEventListener("snowchange", sync);
   window.matchMedia(REDUCED_MOTION).addEventListener("change", event => {
     if (event.matches) stopSnow();
     else sync();

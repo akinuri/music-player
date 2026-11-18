@@ -1,12 +1,14 @@
 export const THEME_PREFERENCES = ["system", "light", "dark", "christmas"];
+// Seasonal default: first-time visitors get the winter theme. Change this one line to ship another default.
+export const DEFAULT_PREFERENCE = "christmas";
 const STORAGE_KEY = "theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 const META_COLORS = { light: "#e6eaed", dark: "#0f1517", christmas: "#0e1410" };
 
-// "christmas" is only ever chosen explicitly; it never comes from the system preference.
-// Anything unknown (or no stored value) means "follow the system".
+// "christmas" never comes from the system preference; it is the default or an explicit choice.
+// Anything unknown (or no stored value) means the default preference.
 export function normalizePreference(value) {
-  return THEME_PREFERENCES.includes(value) ? value : "system";
+  return THEME_PREFERENCES.includes(value) ? value : DEFAULT_PREFERENCE;
 }
 
 export function resolveTheme(preference, prefersDark) {
@@ -19,14 +21,13 @@ export function readPreference(storage = globalThis.localStorage) {
   try {
     return normalizePreference(storage?.getItem(STORAGE_KEY));
   } catch {
-    return "system";
+    return DEFAULT_PREFERENCE;
   }
 }
 
 function writePreference(preference, storage = globalThis.localStorage) {
   try {
-    if (preference === "system") storage.removeItem(STORAGE_KEY);
-    else storage.setItem(STORAGE_KEY, preference);
+    storage.setItem(STORAGE_KEY, preference);
   } catch {
     // Storage can be unavailable (private mode); the choice then lasts until reload.
   }
@@ -39,7 +40,7 @@ export function themeColor(name, alpha = 1) {
   return `rgb(${triplets.get(name)} / ${alpha})`;
 }
 
-let preference = "system";
+let preference = DEFAULT_PREFERENCE;
 
 export function currentPreference() {
   return preference;
