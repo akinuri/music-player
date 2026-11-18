@@ -144,23 +144,11 @@
   --c-viz-peak: 255 235 170;
 }
 
-/* Keep the title text clear of the hat. */
-:root[data-theme="christmas"] #now-playing,
-:root[data-theme="christmas"] #now-artist {
-  padding-right: 3.5rem;
-}
-
 .xmas-hat {
   display: none;
   filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.35));
 }
-:root[data-theme="christmas"] /* Keep the title text clear of the hat. */
-:root[data-theme="christmas"] #now-playing,
-:root[data-theme="christmas"] #now-artist {
-  padding-right: 3.5rem;
-}
-
-.xmas-hat {
+:root[data-theme="christmas"] .xmas-hat {
   display: block;
 }
 
@@ -178,4 +166,28 @@
 }
 .tippy-box[data-theme~="app"] > .tippy-arrow {
   color: rgb(var(--c-tip));
+}
+
+/* Snow drifts along the top edge of every panel (Christmas theme only). */
+:root[data-theme="christmas"] nav.rounded-xl.bg-surface,
+:root[data-theme="christmas"] section.rounded-xl.bg-surface {
+  position: relative;
+}
+:root[data-theme="christmas"] nav.rounded-xl.bg-surface::before,
+:root[data-theme="christmas"] section.rounded-xl.bg-surface::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto -1px;
+  height: 12px;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='12' viewBox='0 0 56 12'%3E%3Cpath d='M0 0H56V4Q51 11 45 6Q40 9 34 5Q28 12 22 6Q16 10 11 5Q5 9 0 4Z' fill='%23f3f7fb'/%3E%3C/svg%3E") repeat-x left top / 56px 12px;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.3));
+  pointer-events: none;
+  z-index: 1;
+}
+.xmas-only {
+  display: none;
+}
+:root[data-theme="christmas"] .xmas-only {
+  display: flex;
 }

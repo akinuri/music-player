@@ -6,7 +6,7 @@ import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
 import { initTooltips } from "./tooltips.js";
-import { initSnow } from "./snow.js";
+import { initSnow, setSnowEnabled, snowEnabled } from "./snow.js";
 import { currentPreference, initTheme, setPreference } from "./theme.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, migrateSavedPlaylist, uniquePlaylistName, parsePlaylists, PlaylistFileError, resolvePlaylist, serializePlaylists } from "./playlists.js";
 import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks } from "./sources.js";
@@ -3152,6 +3152,14 @@ function renderThemeSwitch() {
 }
 for (const button of themeButtons) button.addEventListener("click", () => setPreference(button.dataset.themeOption));
 document.addEventListener("themechange", renderThemeSwitch);
+const snowToggle = $("snow-toggle");
+function renderSnowToggle() {
+  snowToggle.setAttribute("aria-pressed", String(snowEnabled()));
+  snowToggle.title = snowEnabled() ? "Turn snowfall off" : "Turn snowfall on";
+}
+snowToggle.addEventListener("click", () => setSnowEnabled(!snowEnabled()));
+document.addEventListener("snowchange", renderSnowToggle);
+renderSnowToggle();
 renderThemeSwitch();
 initTooltips();
 init();
