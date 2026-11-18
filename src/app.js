@@ -6,6 +6,7 @@ import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
 import { initTooltips } from "./tooltips.js";
+import { initSnow } from "./snow.js";
 import { currentPreference, initTheme, setPreference } from "./theme.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, migrateSavedPlaylist, uniquePlaylistName, parsePlaylists, PlaylistFileError, resolvePlaylist, serializePlaylists } from "./playlists.js";
 import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks } from "./sources.js";
@@ -3144,6 +3145,7 @@ async function init() {
 }
 
 initTheme();
+initSnow();
 const themeButtons = [...document.querySelectorAll("[data-theme-option]")];
 function renderThemeSwitch() {
   for (const button of themeButtons) button.setAttribute("aria-pressed", String(button.dataset.themeOption === currentPreference()));
