@@ -29,12 +29,13 @@ export class Playback {
     this.onChange();
   }
 
-  async play(directory, path, { startAt = 0, autoplay = true } = {}) {
+  // `path` identifies the track (what `this.path` reports); `filePath` locates it inside `directory` when they differ.
+  async play(directory, path, { startAt = 0, autoplay = true, filePath = path } = {}) {
     this.stop();
     const request = this.request;
     this.pendingPath = path;
     try {
-      const file = await getTrackFile(directory, path);
+      const file = await getTrackFile(directory, filePath);
       if (request !== this.request) return;
       this.pendingPath = null;
       this.url = URL.createObjectURL(file);

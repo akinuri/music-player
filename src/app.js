@@ -7,11 +7,12 @@ import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
 import { initTooltips } from "./tooltips.js";
 import { currentPreference, initTheme, setPreference } from "./theme.js";
-import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, parsePlaylists, PlaylistFileError, playlistMatchesLibrary, serializePlaylists } from "./playlists.js";
+import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, migrateSavedPlaylist, parsePlaylists, PlaylistFileError, resolvePlaylist, serializePlaylists } from "./playlists.js";
+import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks } from "./sources.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -32,8 +33,10 @@ let renamingId = null;
 let analysisMetric = "albums";
 let analysisYear = null;
 const analysisSort = { albums: { column: 0, direction: "ascending" }, tracks: { column: null, direction: "ascending" } };
-let selectedPlaylistMatchesLibrary = false;
-let permission = "prompt";
+// Current library keys of the selected saved playlist's tracks (null until resolved), see resolvePlaylist.
+let selectedPlaylistPaths = null;
+// Read permission per source id: "granted", "prompt" or "denied".
+const permissions = new Map();
 let busy = true;
 const player = new Playback({
   onChange: renderPlayback,
@@ -103,6 +106,28 @@ function formatTotal(tracks) {
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = Math.floor(total % 60);
   return known.length ? `${hours ? `${hours}h ` : ""}${minutes}m ${String(seconds).padStart(2, "0")}s${known.length < tracks.length ? " +" : ""}` : "—";
+}
+
+const permissionOf = source => permissions.get(source?.id) ?? "prompt";
+const sourceOf = path => (path && library?.sources.find(source => source.id === splitKey(path).sourceId)) || null;
+const sourcesNeedingAccess = () => (library?.sources || []).filter(source => permissionOf(source) !== "granted");
+const quoteNames = names => names.map(name => `"${name}"`).join(", ");
+
+async function checkPermission(source) {
+  let state = "prompt";
+  try {
+    state = await source.handle.queryPermission({ mode: "read" });
+  } catch (error) {
+    console.error(`Could not check access to "${source.name}":`, error);
+  }
+  permissions.set(source.id, state);
+  return state;
+}
+
+async function trackFile(path) {
+  const source = sourceOf(path);
+  if (!source) throw new Error("The track's folder is not in the library.");
+  return getTrackFile(source.handle, relativePath(path));
 }
 
 function playlistPaths() {
@@ -201,9 +226,9 @@ function setPageTitle(text, scroll) {
 function renderPlayback() {
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
-  setTitle(elements["now-playing"], player.path ? track?.title || player.path : "Nothing playing", track?.trackNumber);
+  setTitle(elements["now-playing"], player.path ? track?.title || relativePath(player.path) : "Nothing playing", track?.trackNumber);
   const details = track ? [track.artist || "Unknown artist", albumText(track)].join(" · ") : "";
-  setPageTitle(track ? `${track.title || player.path} · ${track.artist || "Unknown artist"}` : "Music player", !!track && !player.audio.paused);
+  setPageTitle(track ? `${track.title || relativePath(player.path)} · ${track.artist || "Unknown artist"}` : "Music player", !!track && !player.audio.paused);
   elements["now-artist"].textContent = details;
   elements["now-artist"].title = details;
   elements["visualizer-empty"].classList.toggle("hidden", !!player.path || !!player.pendingPath);
@@ -231,6 +256,63 @@ function renderPlayback() {
   if (currentView === "lyrics") renderLyrics();
 }
 
+// Sources card: one row per folder with its own reconnect/rescan/remove, plus "all" actions when there are several.
+function sourceButton(icon, label, action, { disabled = false, primary = false } = {}) {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.setAttribute("aria-label", label);
+  element.title = label;
+  element.className = `flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:cursor-not-allowed disabled:opacity-40 ${primary ? "border-primary-dark bg-primary text-on-primary hover:bg-primary-dark" : "border-bd-in bg-field text-fg-2 hover:bg-tint-2"}`;
+  element.innerHTML = `<svg aria-hidden="true" class="h-4 w-4"><use href="#icon-${icon}"></use></svg>`;
+  element.disabled = disabled;
+  element.addEventListener("click", action);
+  return element;
+}
+
+function renderSources() {
+  const sources = library?.sources || [];
+  const counts = new Map();
+  for (const track of library?.tracks || []) {
+    const id = splitKey(track.path).sourceId;
+    counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  elements["sources-list"].replaceChildren(...sources.map(source => {
+    const granted = permissionOf(source) === "granted";
+    const item = document.createElement("li");
+    item.className = "rounded-md px-1.5 py-1.5 hover:bg-tint";
+    const name = document.createElement("div");
+    name.className = "truncate text-sm font-medium text-fg";
+    name.textContent = source.name;
+    name.title = source.name;
+    const footer = document.createElement("div");
+    footer.className = "mt-1 flex items-center justify-between gap-2";
+    const count = counts.get(source.id) || 0;
+    const meta = document.createElement("span");
+    meta.className = `min-w-0 truncate text-xs ${granted ? "text-soft" : "text-danger"}`;
+    meta.textContent = granted ? `${count.toLocaleString()} ${count === 1 ? "track" : "tracks"}` : "Needs access";
+    const actions = document.createElement("div");
+    actions.className = "flex shrink-0 gap-1";
+    if (!granted) actions.append(sourceButton("reconnect", `Reconnect ${source.name}`, () => reconnectSources([source]), { disabled: busy, primary: true }));
+    actions.append(
+      sourceButton("rescan", `Rescan ${source.name}`, () => scanSources([source]), { disabled: busy || !granted }),
+      sourceButton("remove", `Remove ${source.name}`, () => removeSource(source), { disabled: busy })
+    );
+    footer.append(meta, actions);
+    item.append(name, footer);
+    return item;
+  }));
+  elements["sources-empty"].classList.toggle("hidden", sources.length > 0);
+  const several = sources.length > 1;
+  elements["sources-footer"].classList.toggle("hidden", !several);
+  elements["sources-footer"].classList.toggle("flex", several);
+  const needAccess = sourcesNeedingAccess().length > 0;
+  elements.reconnect.classList.toggle("hidden", !needAccess);
+  elements.reconnect.classList.toggle("flex", needAccess);
+  elements.reconnect.disabled = busy;
+  elements.rescan.disabled = busy || sources.every(source => permissionOf(source) !== "granted");
+  elements["reset-library"].disabled = busy;
+}
+
 // Lyrics of the playing track, read from the file on demand and cached per path.
 const lyricsCache = new Map();
 let lyricsShown = null;
@@ -245,14 +327,14 @@ async function loadLyrics(path) {
   let source = "Embedded";
   let failed = false;
   try {
-    text = await readLyrics(await getTrackFile(library.handle, path));
+    text = await readLyrics(await trackFile(path));
   } catch (error) {
     console.error("Could not read embedded lyrics:", error);
     failed = true;
   }
   if (!text.trim()) {
     try {
-      const sidecar = await findSiblingFile(library.handle, path, ".txt");
+      const sidecar = await findSiblingFile(sourceOf(path).handle, relativePath(path), ".txt");
       if (sidecar) {
         text = decodeText(await sidecar.arrayBuffer());
         source = sidecar.name;
@@ -272,7 +354,7 @@ async function loadLyrics(path) {
 function renderLyrics() {
   const path = player.path;
   const track = path && trackFor(path);
-  const meta = track ? [track.title || path, track.artist || "Unknown artist"] : path ? [path] : [];
+  const meta = track ? [track.title || relativePath(path), track.artist || "Unknown artist"] : path ? [relativePath(path)] : [];
   const source = path && lyricsCache.get(path)?.source;
   if (source) meta.push(source);
   const metaKey = meta.join("\n");
@@ -742,19 +824,10 @@ function render() {
     indicator.classList.toggle("font-bold", active);
     indicator.classList.toggle("text-deep", active);
   }
-  const folderLabel = library ? "Change folder" : "Choose folder";
-  elements["choose-folder"].setAttribute("aria-label", folderLabel);
-  elements["choose-folder"].title = folderLabel;
-  elements.reconnect.classList.toggle("hidden", !library || permission === "granted");
-  elements.reconnect.classList.toggle("flex", !!library && permission !== "granted");
-  elements.reconnect.disabled = busy;
   elements["choose-folder"].disabled = busy || !("showDirectoryPicker" in window);
   // Draw attention to the folder button until there is something to play.
   elements["choose-folder"].classList.toggle("motion-safe:animate-attention", !library && !elements["choose-folder"].disabled);
-  elements.rescan.disabled = busy || !library || permission !== "granted";
-  elements["reset-library"].classList.toggle("hidden", !library);
-  elements["reset-library"].classList.toggle("flex", !!library);
-  elements["reset-library"].disabled = busy;
+  renderSources();
   elements["group-rows"].replaceChildren();
   elements["track-rows"].replaceChildren();
   if (grouped) {
@@ -878,17 +951,17 @@ function render() {
       button("clear", `Delete playlist: ${selected.name}`, () => removeSavedPlaylist(selected), busy)
     );
     selected.tracks.forEach((track, index) => {
-      const currentTrack = selectedPlaylistMatchesLibrary ? trackFor(track.path) : null;
+      const currentTrack = selectedPlaylistPaths ? trackFor(selectedPlaylistPaths[index]) : null;
       const albumName = track.album || currentTrack?.album;
       const row = itemRow(
         index,
-        track.title || currentTrack?.title || track.path,
+        track.title || currentTrack?.title || relativePath(track.path),
         [track.artist || currentTrack?.artist || "Unknown artist", albumName ? albumText({ album: albumName, year: track.year ?? currentTrack?.year }) : ""].filter(Boolean).join(" · "),
         formatDuration(track.duration),
         "select-none sm:px-6"
       );
-      setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || track.path, track.trackNumber ?? currentTrack?.trackNumber);
-      row.addEventListener("dblclick", () => playSavedTrack(selected, track.path));
+      setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || relativePath(track.path), track.trackNumber ?? currentTrack?.trackNumber);
+      row.addEventListener("dblclick", () => playSavedTrack(selected, index));
       row.tabIndex = 0;
       row.classList.add("focus-visible:outline", "focus-visible:outline-2", "focus-visible:-outline-offset-2", "focus-visible:outline-primary");
       row.addEventListener("keydown", event => {
@@ -933,7 +1006,7 @@ function render() {
   elements.playlist.replaceChildren();
   paths.forEach((path, index) => {
     const track = trackFor(path);
-    const row = itemRow(index, track?.title || path, track ? track.artist || "Unknown artist" : "Not found in library", track ? formatDuration(track.duration) : "", "select-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary");
+    const row = itemRow(index, track?.title || relativePath(path), track ? track.artist || "Unknown artist" : "Not found in library", track ? formatDuration(track.duration) : "", "select-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary");
     row.dataset.path = path;
     row.tabIndex = 0;
     row.addEventListener("dblclick", event => {
@@ -1135,24 +1208,24 @@ function openContextMenu(row, onRemove, event) {
 async function refreshSelectedPlaylistMatch() {
   const saved = savedPlaylists.find(item => item.id === selectedPlaylistId);
   const currentLibrary = library;
-  selectedPlaylistMatchesLibrary = false;
+  selectedPlaylistPaths = null;
   if (!saved || !currentLibrary) return;
   try {
-    const matches = await playlistMatchesLibrary(saved, currentLibrary);
+    const { paths } = await resolvePlaylist(saved, currentLibrary);
     if (selectedPlaylistId === saved.id && library === currentLibrary) {
-      selectedPlaylistMatchesLibrary = matches;
+      selectedPlaylistPaths = paths;
       render();
     }
   } catch (error) {
-    console.error("Could not compare playlist folder:", error);
-    notice("Couldn't check the saved playlist's folder. Saved file paths are shown instead.", true);
+    console.error("Could not match playlist folders:", error);
+    notice("Couldn't check the saved playlist's folders. Saved file paths are shown instead.", true);
   }
 }
 
 function selectPlaylist(saved) {
   currentView = "playlists";
   selectedPlaylistId = saved.id;
-  selectedPlaylistMatchesLibrary = false;
+  selectedPlaylistPaths = null;
   render();
   refreshSelectedPlaylistMatch();
 }
@@ -1284,7 +1357,7 @@ async function saveNamedPlaylist() {
     return;
   }
   const existing = savedPlaylists.find(saved => saved.name.toLocaleLowerCase() === name.toLocaleLowerCase());
-  if (existing && !window.confirm(`Replace the saved playlist "${existing.name}" from "${existing.folderName}"?`)) return;
+  if (existing && !window.confirm(`Replace the saved playlist "${existing.name}"?`)) return;
   busy = true;
   render();
   try {
@@ -1307,30 +1380,30 @@ async function saveNamedPlaylist() {
   if (elements["save-form"].classList.contains("hidden")) elements["save-playlist"].focus();
 }
 
+// Loads a saved playlist into the current one; returns the loaded track keys, or null.
 async function loadPlaylist(saved) {
-  if (busy) return;
+  if (busy) return null;
   busy = true;
   render();
-  let matches;
+  let resolved = null;
   try {
-    matches = await playlistMatchesLibrary(saved, library);
+    resolved = await resolvePlaylist(saved, library);
   } catch (error) {
-    console.error("Could not compare playlist folder:", error);
-    notice("Couldn't check the saved playlist's folder. Choose its music folder and try again.", true);
+    console.error("Could not match playlist folders:", error);
+    notice("Couldn't check the saved playlist's folders. Add its music folders and try again.", true);
   } finally {
     busy = false;
     render();
   }
-  if (matches === undefined) return false;
-  if (!matches) {
-    notice(`Choose the folder "${saved.folderName}" before loading this playlist.`, true);
-    return false;
+  if (!resolved) return null;
+  const anyFound = resolved.paths.some(path => sourceOf(path));
+  if (!anyFound && saved.tracks.length) {
+    notice(`Add ${resolved.missing.length === 1 ? "the folder" : "the folders"} ${quoteNames(resolved.missing)} before loading this playlist.`, true);
+    return null;
   }
-  if (await updatePlaylist(saved.tracks.map(track => track.path), { loadedPlaylistId: saved.id })) {
-    notice(`Loaded playlist "${saved.name}".`);
-    return true;
-  }
-  return false;
+  if (!await updatePlaylist(resolved.paths, { loadedPlaylistId: saved.id })) return null;
+  notice(`Loaded playlist "${saved.name}".${resolved.missing.length ? ` Tracks from ${quoteNames(resolved.missing)} aren't in the library.` : ""}`, resolved.missing.length > 0);
+  return resolved.paths;
 }
 
 async function removeSavedTrack(saved, index) {
@@ -1354,11 +1427,19 @@ async function updateSavedTracks(saved, tracks, action) {
   }
 }
 
-async function playSavedTrack(saved, path) {
+async function playSavedTrack(saved, index) {
   if (busy) return;
-  const paths = saved.tracks.map(track => track.path);
-  const alreadyLoaded = library?.loadedPlaylistId === saved.id && playlistPaths().length === paths.length && playlistPaths().every((item, index) => item === paths[index]);
-  if (alreadyLoaded || await loadPlaylist(saved)) playTrack(path);
+  let paths = null;
+  if (library?.loadedPlaylistId === saved.id) {
+    try {
+      ({ paths } = await resolvePlaylist(saved, library));
+    } catch (error) {
+      console.error("Could not match playlist folders:", error);
+    }
+  }
+  const loaded = paths && playlistPaths().length === paths.length && playlistPaths().every((item, i) => item === paths[i]);
+  if (!loaded) paths = await loadPlaylist(saved);
+  if (paths) playTrack(paths[index]);
 }
 
 async function removeSavedPlaylist(saved) {
@@ -1444,14 +1525,18 @@ function clearSession() {
 
 async function restoreSession() {
   const session = pendingSession;
-  if (!session || !library || permission !== "granted" || player.path || player.pendingPath) return;
+  if (!session || !library || player.path || player.pendingPath) return;
+  // Sessions saved before multiple sources existed hold a path inside the (then only) folder.
+  const path = splitKey(session.path).sourceId || !library.sources.length ? session.path : `${library.sources[0].id}:${session.path}`;
+  const source = sourceOf(path);
+  if (source && permissionOf(source) !== "granted") return;
   pendingSession = null;
-  if (!playlistPaths().includes(session.path) || !trackFor(session.path)) {
+  if (!source || !playlistPaths().includes(path) || !trackFor(path)) {
     clearSession();
     return;
   }
   try {
-    await player.play(library.handle, session.path, { startAt: session.time, autoplay: session.playing });
+    await player.play(source.handle, path, { startAt: session.time, autoplay: session.playing, filePath: relativePath(path) });
   } catch (error) {
     // Browsers may block autoplay after a reload; the track stays loaded and paused.
     if (error.name === "NotAllowedError" || error.name === "AbortError") return;
@@ -1461,26 +1546,22 @@ async function restoreSession() {
 }
 
 async function playTrack(path) {
-  if (!library || !trackFor(path)) {
+  const source = sourceOf(path);
+  if (!library || !trackFor(path) || !source) {
     notice("This playlist track is not in the library. Rescan or remove it.", true);
     return;
   }
-  if (permission !== "granted") {
-    notice("Reconnect the music folder before playing tracks.", true);
+  if (permissionOf(source) !== "granted") {
+    notice(`Reconnect "${source.name}" before playing its tracks.`, true);
     return;
   }
   try {
-    await player.play(library.handle, path);
+    await player.play(source.handle, path, { filePath: relativePath(path) });
   } catch (error) {
     if (error.name === "AbortError") return;
     console.error("Playback failed:", error);
-    try {
-      permission = await library.handle.queryPermission({ mode: "read" });
-    } catch (permissionError) {
-      console.error("Could not check folder permission:", permissionError);
-      permission = "prompt";
-    }
-    notice(permission === "granted" ? "Couldn't play this file. It may have been moved, removed, or be unsupported. Try rescanning." : "Folder access expired. Reconnect the folder to play tracks.", true);
+    const state = await checkPermission(source);
+    notice(state === "granted" ? "Couldn't play this file. It may have been moved, removed, or be unsupported. Try rescanning." : `Access to "${source.name}" expired. Reconnect it to play its tracks.`, true);
     render();
   }
 }
@@ -1495,39 +1576,109 @@ function advance(direction) {
   }
 }
 
-async function runScan(handle) {
+// Scans the given sources one after another, saving after each so a failure keeps the folders already done.
+async function scanSources(sources) {
+  if (busy || !sources.length) return;
   busy = true;
   render();
-  notice("Scanning your folder…", false, [], { sticky: true });
+  const several = sources.length > 1;
+  const scanned = [];
+  const failed = [];
+  const warnings = [];
+  let total = 0;
   try {
-    const { tracks, warnings } = await scanLibrary(handle, readMetadata, count => notice(`Scanning your folder… ${count.toLocaleString()} tracks indexed`, false, [], { sticky: true }));
-    const sameFolder = library && await library.handle.isSameEntry(handle);
-    const next = { handle, folderName: handle.name, tracks, scannedAt: Date.now(), playlist: sameFolder ? playlistPaths() : [], loadedPlaylistId: sameFolder ? library.loadedPlaylistId ?? null : null };
-    await saveLibrary(next);
-    if (!sameFolder) {
-      player.stop();
-      clearSession();
-      libraryGroup = null;
-      artistAlbum = null;
-    }
-    library = next;
-    lyricsCache.clear();
-    permission = "granted";
-    await refreshSelectedPlaylistMatch();
-    const trackCount = tracks.length.toLocaleString();
-    const warningCount = warnings.length.toLocaleString();
-    notice(`Library updated: ${trackCount} ${tracks.length === 1 ? "track" : "tracks"}.${warnings.length ? ` ${warningCount} ${warnings.length === 1 ? "track has" : "tracks have"} unreadable information:` : ""}`, warnings.length > 0, warnings);
-  } catch (error) {
-    console.error("Library scan failed:", error);
-    if (library) {
+    for (const source of sources) {
+      const prefix = several ? `Scanning "${source.name}" (${scanned.length + failed.length + 1} of ${sources.length})…` : `Scanning "${source.name}"…`;
+      notice(prefix, false, [], { sticky: true });
       try {
-        permission = await library.handle.queryPermission({ mode: "read" });
-      } catch (permissionError) {
-        console.error("Could not check folder permission:", permissionError);
-        permission = "prompt";
+        const result = await scanLibrary(source.handle, readMetadata, count => notice(`${prefix} ${count.toLocaleString()} tracks indexed`, false, [], { sticky: true }));
+        const next = withSourceTracks(library, { ...source, scannedAt: Date.now() }, result.tracks);
+        await saveLibrary(next);
+        library = next;
+        permissions.set(source.id, "granted");
+        scanned.push(source);
+        total += result.tracks.length;
+        warnings.push(...result.warnings.map(warning => several ? { ...warning, path: `${source.name}/${warning.path}` } : warning));
+      } catch (error) {
+        console.error(`Scan of "${source.name}" failed:`, error);
+        failed.push(source);
+        if (library?.sources.some(item => item.id === source.id)) await checkPermission(source);
       }
     }
-    notice("Couldn't finish the scan or save the index. Your previous library was kept. Check folder access and try again.", true);
+    lyricsCache.clear();
+    await refreshSelectedPlaylistMatch();
+    const parts = [];
+    if (scanned.length) parts.push(`${several ? `Scanned ${scanned.length.toLocaleString()} folders` : `Scanned "${scanned[0].name}"`}: ${total.toLocaleString()} ${total === 1 ? "track" : "tracks"}.`);
+    if (failed.length) parts.push(`Couldn't scan ${quoteNames(failed.map(source => source.name))}. Check folder access and try again.`);
+    if (warnings.length) parts.push(`${warnings.length.toLocaleString()} ${warnings.length === 1 ? "track has" : "tracks have"} unreadable information:`);
+    notice(parts.join(" "), failed.length > 0 || warnings.length > 0, warnings);
+  } finally {
+    busy = false;
+    render();
+    restoreSession();
+  }
+}
+
+// Adds folders as new sources; a folder that is already a source is rescanned instead.
+async function addFolders(handles) {
+  if (busy || !handles.length) return;
+  const targets = [];
+  for (const handle of handles) {
+    let existing = null;
+    for (const source of [...(library?.sources || []), ...targets]) {
+      try {
+        if (await source.handle.isSameEntry(handle)) {
+          existing = source;
+          break;
+        }
+      } catch (error) {
+        console.error("Could not compare folders:", error);
+      }
+    }
+    if (targets.includes(existing)) continue;
+    targets.push(existing ? { ...existing, handle } : { id: crypto.randomUUID(), handle, name: handle.name, scannedAt: null });
+  }
+  await scanSources(targets);
+}
+
+async function reconnectSources(sources) {
+  if (busy || !sources.length) return;
+  for (const source of sources) {
+    try {
+      permissions.set(source.id, await source.handle.requestPermission({ mode: "read" }));
+    } catch (error) {
+      console.error(`Could not reconnect "${source.name}":`, error);
+    }
+  }
+  render();
+  const missing = sources.filter(source => permissionOf(source) !== "granted");
+  if (missing.length) notice(`No access to ${quoteNames(missing.map(source => source.name))}. Reconnect again, or remove and re-add the folder.`, true);
+  else notice(sources.length === 1 ? `Reconnected "${sources[0].name}".` : "Folders reconnected.");
+  restoreSession();
+}
+
+// Forgets one folder: its tracks leave the library and the current playlist. The folder on disk is untouched.
+async function removeSource(source) {
+  if (busy || !confirm(`Remove "${source.name}" from the library? Its tracks leave the library and the current playlist. The folder itself isn't touched.`)) return;
+  if (library.sources.length === 1) return resetLibrary(`Removed "${source.name}". Add a folder to start again.`);
+  busy = true;
+  render();
+  try {
+    const next = withoutSource(library, source.id);
+    await saveLibrary(next);
+    if (splitKey(player.path || player.pendingPath || "").sourceId === source.id) {
+      player.stop();
+      clearSession();
+    }
+    library = next;
+    permissions.delete(source.id);
+    lyricsCache.clear();
+    validateRoute();
+    await refreshSelectedPlaylistMatch();
+    notice(`Removed "${source.name}".`);
+  } catch (error) {
+    console.error("Could not remove source:", error);
+    notice(`Couldn't remove "${source.name}". Check your browser's storage settings and try again.`, true);
   } finally {
     busy = false;
     render();
@@ -1536,8 +1687,8 @@ async function runScan(handle) {
 
 elements["dismiss-notice"].addEventListener("click", hideNotice);
 
-// Forgets the folder, its index and the current playlist. Saved playlists are kept.
-async function resetLibrary() {
+// Forgets every folder, their index and the current playlist. Saved playlists are kept.
+async function resetLibrary(message = "Library cleared. Add a folder to start again.") {
   if (busy || !library) return;
   busy = true;
   render();
@@ -1546,14 +1697,15 @@ async function resetLibrary() {
     player.stop();
     clearSession();
     library = null;
-    permission = "prompt";
+    permissions.clear();
     libraryGroup = null;
     artistAlbum = null;
+    lyricsCache.clear();
     await refreshSelectedPlaylistMatch();
-    notice("Library reset. Choose a folder to start again.");
+    notice(message);
   } catch (error) {
     console.error("Library reset failed:", error);
-    notice("Couldn't reset the library. Check your browser's storage settings and try again.", true);
+    notice("Couldn't clear the library. Check your browser's storage settings and try again.", true);
   } finally {
     busy = false;
     render();
@@ -1562,7 +1714,7 @@ async function resetLibrary() {
 }
 
 elements["reset-library"].addEventListener("click", () => {
-  if (confirm("Reset the library? This forgets the folder, its index and the current playlist. Saved playlists are kept.")) resetLibrary();
+  if (confirm("Remove all folders from the library? This forgets their index and the current playlist. Saved playlists are kept.")) resetLibrary();
 });
 
 const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-primary", "!animate-none"];
@@ -1575,9 +1727,9 @@ const canDropFolder = () => !busy && "showDirectoryPicker" in window && "getAsFi
 async function dropFolder(dataTransfer) {
   try {
     const handles = await Promise.all([...dataTransfer.items].filter(item => item.kind === "file").map(item => item.getAsFileSystemHandle()));
-    const folder = handles.find(handle => handle?.kind === "directory");
-    if (!folder) notice("Drop a folder, not files.", true);
-    else await runScan(folder);
+    const folders = handles.filter(handle => handle?.kind === "directory");
+    if (!folders.length) notice("Drop folders, not files.", true);
+    else await addFolders(folders);
   } catch (error) {
     console.error("Folder drop failed:", error);
     notice("Couldn't open that folder. Check browser permissions and try again.", true);
@@ -1592,7 +1744,7 @@ function dropPlaylistFiles(dataTransfer) {
 
 // Buttons that accept dropped files. The import button is re-created on render, so targets are looked up on demand.
 const dropTargets = [
-  { element: () => elements["choose-folder"], enabled: canDropFolder, drop: dropFolder, text: "Drop folder" },
+  { element: () => elements["choose-folder"], enabled: canDropFolder, drop: dropFolder, text: "Drop folders" },
   // The playlists card clips its contents (rounded corners), which would cut off the enlarged button, so unclip it while dragging.
   { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy && !!library, drop: dropPlaylistFiles, text: "Drop playlists (.json)", unclip: node => node.closest("section") }
 ];
@@ -1666,8 +1818,7 @@ document.addEventListener("drop", async event => {
 document.addEventListener("dragend", endDrag);
 elements["choose-folder"].addEventListener("click", async () => {
   try {
-    const handle = await window.showDirectoryPicker({ mode: "read" });
-    await runScan(handle);
+    await addFolders([await window.showDirectoryPicker({ mode: "read" })]);
   } catch (error) {
     if (error.name !== "AbortError") {
       console.error("Folder selection failed:", error);
@@ -1675,21 +1826,11 @@ elements["choose-folder"].addEventListener("click", async () => {
     }
   }
 });
-
-elements.reconnect.addEventListener("click", async () => {
-  try {
-    permission = await library.handle.requestPermission({ mode: "read" });
-    render();
-    if (permission === "granted") {
-      notice("Folder reconnected. You can play tracks or rescan your library.");
-      restoreSession();
-    } else notice("Folder access was not granted. Reconnect or choose the folder again to play or rescan.", true);
-  } catch (error) {
-    console.error("Folder reconnection failed:", error);
-    notice("Couldn't reconnect this folder. Choose the folder again to restore access.", true);
-  }
+elements.reconnect.addEventListener("click", () => reconnectSources(sourcesNeedingAccess()));
+elements.rescan.addEventListener("click", () => {
+  const sources = library.sources.filter(source => permissionOf(source) === "granted");
+  scanSources(sources);
 });
-elements.rescan.addEventListener("click", () => runScan(library.handle));
 elements.search.addEventListener("input", render);
 for (const sortButton of sortButtons) {
   sortButton.addEventListener("click", () => {
@@ -2085,7 +2226,7 @@ function validateRoute() {
 window.addEventListener("popstate", () => {
   applyRoute();
   validateRoute();
-  selectedPlaylistMatchesLibrary = false;
+  selectedPlaylistPaths = null;
   elements.search.value = "";
   render();
   refreshSelectedPlaylistMatch();
@@ -2099,17 +2240,12 @@ async function init() {
   }
   try {
     const [storedLibrary, storedPlaylists] = await Promise.all([loadLibrary(), loadSavedPlaylists()]);
-    library = storedLibrary || null;
-    savedPlaylists = storedPlaylists;
-    if (library) {
-      try {
-        permission = await library.handle.queryPermission({ mode: "read" });
-        if (permission !== "granted") notice("Permission needed to play or rescan. Use Reconnect to grant folder access.", true);
-      } catch (error) {
-        console.error("Could not check folder permission:", error);
-        notice("The saved folder is unavailable. Choose the folder again to restore access.", true);
-      }
-    }
+    library = migrateLibrary(storedLibrary);
+    if (library && library !== storedLibrary) await saveLibrary(library);
+    savedPlaylists = storedPlaylists.map(migrateSavedPlaylist);
+    for (const source of library?.sources || []) await checkPermission(source);
+    const locked = sourcesNeedingAccess();
+    if (locked.length) notice(`Access needed for ${quoteNames(locked.map(source => source.name))}. Use Reconnect in Sources to play or rescan.`, true);
   } catch (error) {
     console.error("Could not load library:", error);
     notice("Couldn't open local storage. Check your browser's storage settings and reload.", true);
