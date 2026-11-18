@@ -1,4 +1,4 @@
-import { findSiblingFile, getTrackFile, scanLibrary } from "./filesystem.js";
+import { findSiblingFile, getTrackFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata } from "./metadata.js";
 import { activeLyricIndex, decodeText, parseLyrics } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
@@ -112,6 +112,11 @@ const permissionOf = source => permissions.get(source?.id) ?? "prompt";
 const sourceOf = path => (path && library?.sources.find(source => source.id === splitKey(path).sourceId)) || null;
 const sourcesNeedingAccess = () => (library?.sources || []).filter(source => permissionOf(source) !== "granted");
 const quoteNames = names => names.map(name => `"${name}"`).join(", ");
+// What a source contains, e.g. "Rock, Jazz, cover.jpg…" ("" if not known yet).
+// (Folders listed by an earlier version end in "/", which is dropped.)
+const contentsText = source => source.contents?.names.length ? `${source.contents.names.map(name => name.replace(/\/$/, "")).join(", ")}${source.contents.more ? "…" : ""}` : "";
+// Whether another source has the same name, so the contents are needed to tell them apart.
+const nameClashes = source => (library?.sources || []).some(other => other.id !== source.id && other.name.toLocaleLowerCase() === source.name.toLocaleLowerCase());
 
 async function checkPermission(source) {
   let state = "prompt";
@@ -322,7 +327,7 @@ function renderSourceFilter() {
       saveSourceFilter();
       render();
     }, "border-b border-bd-2 font-medium"),
-    ...sources.map(source => option(source.name, !active || active.has(source.id), event => {
+    ...sources.map(source => option(nameClashes(source) && contentsText(source) ? `${source.name} (${contentsText(source)})` : source.name, !active || active.has(source.id), event => {
       const next = new Set(active || sources.map(item => item.id));
       if (event.target.checked) next.add(source.id);
       else next.delete(source.id);
@@ -405,7 +410,9 @@ function renderSources() {
     const name = document.createElement("div");
     name.className = "truncate text-sm font-medium text-fg";
     name.textContent = source.name;
-    name.title = source.name;
+    const clash = nameClashes(source) && contentsText(source);
+    // When the contents are shown under the name, a tooltip would repeat them.
+    if (!clash) name.title = contentsText(source) || source.name;
     const footer = document.createElement("div");
     footer.className = "mt-1 flex items-center justify-between gap-2";
     const count = counts.get(source.id) || 0;
@@ -420,7 +427,14 @@ function renderSources() {
       sourceButton("remove", `Remove ${source.name}`, () => removeSource(source), { disabled: busy })
     );
     footer.append(meta, actions);
-    item.append(name, footer);
+    item.append(name);
+    if (clash) {
+      const contents = document.createElement("div");
+      contents.className = "truncate text-xs text-soft";
+      contents.textContent = contentsText(source);
+      item.append(contents);
+    }
+    item.append(footer);
     return item;
   }));
   elements["sources-empty"].classList.toggle("hidden", sources.length > 0);
@@ -1715,8 +1729,9 @@ async function scanSources(sources) {
       const prefix = several ? `Scanning "${source.name}" (${scanned.length + failed.length + 1} of ${sources.length})…` : `Scanning "${source.name}"…`;
       notice(prefix, false, [], { sticky: true });
       try {
+        const contents = await listContents(source.handle);
         const result = await scanLibrary(source.handle, readMetadata, count => notice(`${prefix} ${count.toLocaleString()} tracks indexed`, false, [], { sticky: true }));
-        const next = withSourceTracks(library, { ...source, scannedAt: Date.now() }, result.tracks);
+        const next = withSourceTracks(library, { ...source, contents, scannedAt: Date.now() }, result.tracks);
         await saveLibrary(next);
         library = next;
         permissions.set(source.id, "granted");
@@ -2368,6 +2383,22 @@ async function init() {
     if (library && library !== storedLibrary) await saveLibrary(library);
     savedPlaylists = storedPlaylists.map(migrateSavedPlaylist);
     for (const source of library?.sources || []) await checkPermission(source);
+    if (library?.sources.some(source => !source.contents && permissionOf(source) === "granted")) {
+      const sources = [];
+      for (const source of library.sources) {
+        let contents = source.contents;
+        if (!contents && permissionOf(source) === "granted") {
+          try {
+            contents = await listContents(source.handle);
+          } catch (error) {
+            console.error(`Could not list "${source.name}":`, error);
+          }
+        }
+        sources.push(contents ? { ...source, contents } : source);
+      }
+      library = { ...library, sources };
+      await saveLibrary(library);
+    }
     const locked = sourcesNeedingAccess();
     if (locked.length) notice(`Access needed for ${quoteNames(locked.map(source => source.name))}. Use Reconnect in Sources to play or rescan.`, true);
   } catch (error) {

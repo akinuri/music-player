@@ -19,6 +19,20 @@ export async function getTrackFile(directory, path) {
   return handle.getFile();
 }
 
+// The first few top-level entries of a folder (sub-folders first), so folders with the same name
+// can be told apart. Browsers don't reveal a folder's location on disk.
+export async function listContents(directory, limit = 3) {
+  const folders = [];
+  const files = [];
+  for await (const [name, handle] of directory.entries()) {
+    if (name.startsWith(".")) continue;
+    (handle.kind === "directory" ? folders : files).push(name);
+  }
+  const byName = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+  const names = [...folders.sort(byName), ...files.sort(byName)];
+  return { names: names.slice(0, limit), more: names.length > limit };
+}
+
 // The file next to `path` with the same base name and the given extension (case-insensitive), or null.
 export async function findSiblingFile(directory, path, extension) {
   const parts = path.split("/");

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findSiblingFile, getTrackFile, scanLibrary } from "../src/filesystem.js";
+import { findSiblingFile, getTrackFile, listContents, scanLibrary } from "../src/filesystem.js";
 
 function file(name, overrides = {}) {
   return { kind: "file", getFile: async () => ({ name, size: 12, lastModified: 1, ...overrides }) };
@@ -74,4 +74,10 @@ test("finds a same-named sibling file case-insensitively, in nested folders", as
   };
   assert.equal((await findSiblingFile(root, "album/Song.MP3", ".txt")).name, "song.TXT");
   assert.equal(await findSiblingFile(root, "a.mp3", ".txt"), null);
+});
+
+test("lists a folder's first entries, sub-folders first in natural order, skipping hidden ones", async () => {
+  const root = directory([["b.mp3", file("b.mp3")], ["Rock", directory([])], [".hidden", directory([])], ["Album 10", directory([])], ["Album 2", directory([])], ["a.jpg", file("a.jpg")]]);
+  assert.deepEqual(await listContents(root), { names: ["Album 2", "Album 10", "Rock"], more: true });
+  assert.deepEqual(await listContents(root, 10), { names: ["Album 2", "Album 10", "Rock", "a.jpg", "b.mp3"], more: false });
 });
