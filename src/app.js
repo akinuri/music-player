@@ -6,6 +6,8 @@ import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
 import { initTooltips } from "./tooltips.js";
+import { initSnow, setSnowEnabled, snowEnabled } from "./snow.js";
+import { currentPreference, initTheme, setPreference } from "./theme.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, parsePlaylists, PlaylistFileError, playlistMatchesLibrary, serializePlaylists } from "./playlists.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
@@ -60,13 +62,13 @@ function notice(message, error = false, warnings = [], { sticky = false } = {}) 
   const element = elements.notice;
   const content = elements["notice-content"];
   content.textContent = message;
-  element.className = `relative overflow-hidden flex items-start gap-3 rounded-lg border px-4 py-3 text-base ${error ? "border-[#efd6ce] bg-[#fff7f4] text-[#8c4a36]" : "border-[#c9dfd3] bg-[#f2f8ee] text-forest"}`;
+  element.className = `relative overflow-hidden flex items-start gap-3 rounded-lg border px-4 py-3 text-base ${error ? "border-bd-danger bg-danger-soft text-danger" : "border-bd-ok bg-ok-soft text-forest"}`;
   const bar = elements["notice-progress"];
   bar.classList.toggle("hidden", sticky);
   if (!sticky) {
     const duration = error ? ERROR_NOTICE_DURATION : NOTICE_DURATION;
-    bar.classList.toggle("bg-[#8c4a36]/40", error);
-    bar.classList.toggle("bg-[#315e55]/50", !error);
+    bar.classList.toggle("bg-danger/40", error);
+    bar.classList.toggle("bg-primary/50", !error);
     bar.style.transition = "none";
     bar.style.width = "100%";
     bar.getBoundingClientRect();
@@ -76,7 +78,7 @@ function notice(message, error = false, warnings = [], { sticky = false } = {}) 
   }
   if (warnings.length) {
     const list = document.createElement("ul");
-    list.className = "mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#8c4a36]";
+    list.className = "mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger";
     list.tabIndex = 0;
     list.setAttribute("aria-label", "Problematic tracks");
     for (const warning of warnings) {
@@ -128,7 +130,7 @@ function renderCrumbs(container, crumbs) {
     }
     const link = document.createElement("button");
     link.type = "button";
-    link.className = "font-medium text-[#46685f] hover:text-[#284f48] hover:underline";
+    link.className = "font-medium text-deep-2 hover:text-deep hover:underline";
     if (index === crumbs.length - 1) link.setAttribute("aria-current", "page");
     link.textContent = crumb.label;
     link.addEventListener("click", crumb.action);
@@ -139,7 +141,7 @@ function renderCrumbs(container, crumbs) {
 function renderMeta(container, items) {
   container.replaceChildren(...items.map(text => {
     const chip = document.createElement("span");
-    chip.className = "rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]";
+    chip.className = "rounded-md bg-tint px-2 py-0.5 text-deep";
     chip.textContent = text;
     return chip;
   }));
@@ -154,7 +156,7 @@ function setTitle(element, text, number) {
   const numberText = trackNumberText(number);
   if (!numberText) return;
   const suffix = document.createElement("span");
-  suffix.className = "font-normal text-[#a3b0b4]";
+  suffix.className = "font-normal text-faint-2";
   suffix.textContent = ` · ${numberText}`;
   element.append(suffix);
 }
@@ -222,8 +224,8 @@ function renderPlayback() {
   elements.seek.max = elements.seek.disabled ? "0" : String(duration);
   elements.seek.value = String(player.audio.currentTime || 0);
   for (const row of elements.playlist.children) {
-    row.classList.toggle("bg-[#dcece6]", row.dataset.path === player.path);
-    row.classList.toggle("hover:bg-[#f1f6f4]", row.dataset.path !== player.path);
+    row.classList.toggle("bg-sel-2", row.dataset.path === player.path);
+    row.classList.toggle("hover:bg-subtle", row.dataset.path !== player.path);
   }
   if (player.path !== scrolledPath) scrollToPlayingRow();
   renderPlaylistStats();
@@ -290,9 +292,9 @@ function renderLyrics() {
       row.textContent = line.text || "\u00a0";
       if (entry.synced) {
         row.dataset.time = line.time;
-        row.className = "-mx-2 cursor-pointer rounded-md px-2 py-1 text-[#8a999e] transition-colors duration-200 hover:bg-[#f1f6f4] hover:text-[#5d7079]";
+        row.className = "-mx-2 cursor-pointer rounded-md px-2 py-1 text-faint transition-colors duration-200 hover:bg-subtle hover:text-soft";
       } else {
-        row.className = "text-[#273b44]";
+        row.className = "text-fg-2";
       }
       return row;
     }));
@@ -313,11 +315,11 @@ function highlightLyric(lines) {
   const index = activeLyricIndex(lines, (player.audio.currentTime || 0) + 0.2);
   if (index === lyricsActive) return;
   const rows = elements["lyrics-lines"].children;
-  rows[lyricsActive]?.classList.remove("!text-[#284f48]", "font-semibold");
+  rows[lyricsActive]?.classList.remove("!text-deep", "font-semibold");
   lyricsActive = index;
   const row = rows[index];
   if (!row) return;
-  row.classList.add("!text-[#284f48]", "font-semibold");
+  row.classList.add("!text-deep", "font-semibold");
   if (Date.now() - lyricsUserScrolledAt < 4000) return;
   const scroller = elements["lyrics-lines"];
   const view = scroller.getBoundingClientRect();
@@ -386,7 +388,7 @@ function button(icon, label, action, disabled = false, compact = false) {
   element.type = "button";
   element.setAttribute("aria-label", label);
   element.title = buttonTitles[icon];
-  element.className = `flex ${compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-[#f7faf9] text-[#28454a] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40`;
+  element.className = `flex ${compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40`;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", "h-5 w-5");
@@ -437,11 +439,11 @@ function renderAnalysis() {
   for (const [metric, buttonElement] of [["albums", elements["analysis-albums"]], ["tracks", elements["analysis-tracks"]]]) {
     const active = metric === analysisMetric;
     buttonElement.setAttribute("aria-pressed", String(active));
-    buttonElement.classList.toggle("bg-[#e1eee8]", active);
+    buttonElement.classList.toggle("bg-sel", active);
     buttonElement.classList.toggle("font-semibold", active);
-    buttonElement.classList.toggle("text-[#284f48]", active);
-    buttonElement.classList.toggle("bg-[#f7faf9]", !active);
-    buttonElement.classList.toggle("hover:bg-[#e9f2ee]", !active);
+    buttonElement.classList.toggle("text-deep", active);
+    buttonElement.classList.toggle("bg-field", !active);
+    buttonElement.classList.toggle("hover:bg-tint-2", !active);
   }
   renderCrumbs(elements["analysis-title"], [
     { label: "Analysis", action: () => { analysisYear = null; render(); elements["analysis-heading"].focus(); } },
@@ -463,7 +465,7 @@ function renderAnalysis() {
     const isSelected = item === selected;
     const column = document.createElement("button");
     column.type = "button";
-    column.className = `flex h-full w-10 shrink-0 flex-col rounded-t-md ${isSelected ? "bg-[#e1eee8]" : "hover:bg-[#f1f6f4]"}`;
+    column.className = `flex h-full w-10 shrink-0 flex-col rounded-t-md ${isSelected ? "bg-sel" : "hover:bg-subtle"}`;
     column.setAttribute("aria-pressed", String(isSelected));
     column.setAttribute("aria-label", `${item.year}: ${count(value, albumsMetric ? "album" : "track")}`);
     column.addEventListener("click", () => {
@@ -475,16 +477,16 @@ function renderAnalysis() {
     if (value) {
       const height = (value / peak) * 82;
       const bar = document.createElement("div");
-      bar.className = `absolute bottom-0 left-1/2 w-5 -translate-x-1/2 rounded-t ${isSelected ? "bg-[#315e55]" : "bg-[#8fb8a6]"}`;
+      bar.className = `absolute bottom-0 left-1/2 w-5 -translate-x-1/2 rounded-t ${isSelected ? "bg-primary" : "bg-primary-light"}`;
       bar.style.height = `${height}%`;
       const label = document.createElement("span");
-      label.className = "absolute inset-x-0 text-center text-xs tabular-nums text-[#5d7079]";
+      label.className = "absolute inset-x-0 text-center text-xs tabular-nums text-soft";
       label.style.bottom = `calc(${height}% + 2px)`;
       label.textContent = String(value);
       plot.append(bar, label);
     }
     const year = document.createElement("span");
-    year.className = `py-1.5 text-center text-xs tabular-nums ${value ? "font-medium text-[#46685f]" : "text-[#a3b0b4]"}`;
+    year.className = `py-1.5 text-center text-xs tabular-nums ${value ? "font-medium text-deep-2" : "text-faint-2"}`;
     year.textContent = String(item.year);
     column.append(plot, year);
     return column;
@@ -502,7 +504,7 @@ function renderAnalysis() {
   detail.replaceChildren();
   const hint = text => {
     const message = document.createElement("p");
-    message.className = "px-4 py-8 text-center text-base text-[#5d7079] sm:px-6";
+    message.className = "px-4 py-8 text-center text-base text-soft sm:px-6";
     message.textContent = text;
     detail.append(message);
   };
@@ -539,7 +541,7 @@ function renderAnalysis() {
   table.className = "w-full min-w-[480px] table-fixed border-collapse text-base";
   const colgroup = document.createElement("colgroup");
   const headRow = document.createElement("tr");
-  headRow.className = "border-b border-[#e1e9e7]";
+  headRow.className = "border-b border-bd-2";
   columns.forEach((column, index) => {
     const col = document.createElement("col");
     col.className = column.width;
@@ -551,12 +553,12 @@ function renderAnalysis() {
     if (active) heading.setAttribute("aria-sort", sort.direction);
     const sortButton = document.createElement("button");
     sortButton.type = "button";
-    sortButton.className = `flex w-full items-center gap-2 hover:text-[#284f48] ${column.end ? "justify-end text-right" : "text-left"}`;
+    sortButton.className = `flex w-full items-center gap-2 hover:text-deep ${column.end ? "justify-end text-right" : "text-left"}`;
     const label = document.createElement("span");
     label.textContent = column.label;
     const indicator = document.createElement("span");
     indicator.setAttribute("aria-hidden", "true");
-    indicator.className = active ? "font-bold text-[#284f48]" : "opacity-50";
+    indicator.className = active ? "font-bold text-deep" : "opacity-50";
     indicator.textContent = active ? (sort.direction === "ascending" ? "↑" : "↓") : "↕";
     sortButton.append(label, indicator);
     sortButton.addEventListener("click", () => {
@@ -568,18 +570,18 @@ function renderAnalysis() {
     headRow.append(heading);
   });
   const thead = document.createElement("thead");
-  thead.className = "sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]";
+  thead.className = "sticky top-0 z-10 bg-head text-soft";
   thead.append(headRow);
   const tbody = document.createElement("tbody");
   const nameColumn = albumsMetric ? 0 : 1;
   for (const row of rows) {
     const tr = document.createElement("tr");
-    tr.className = `border-b border-[#e7ecec] last:border-b-0 ${row.album === null ? "" : "cursor-pointer hover:bg-[#f7faf9]"}`;
+    tr.className = `border-b border-bd-3 last:border-b-0 ${row.album === null ? "" : "cursor-pointer hover:bg-field"}`;
     if (row.album !== null) tr.addEventListener("click", event => {
       if (!event.target.closest("button")) openAlbum(row.album);
     });
     row.cells.forEach((value, index) => {
-      const cell = trackCell(value, `${columns[index].end ? "text-right tabular-nums" : ""} ${index === nameColumn ? "font-medium text-[#263940]" : "text-[#5d7079]"}`);
+      const cell = trackCell(value, `${columns[index].end ? "text-right tabular-nums" : ""} ${index === nameColumn ? "font-medium text-fg-2" : "text-soft"}`);
       if (index === nameColumn && row.album !== null) {
         const open = document.createElement("button");
         open.type = "button";
@@ -603,11 +605,11 @@ function render() {
     const active = currentView === view;
     const nav = elements[`nav-${view}`];
     const panel = elements[`${view}-view`];
-    nav.classList.toggle("bg-[#e1eee8]", active);
+    nav.classList.toggle("bg-sel", active);
     nav.classList.toggle("font-semibold", active);
-    nav.classList.toggle("text-[#284f48]", active);
+    nav.classList.toggle("text-deep", active);
     nav.classList.toggle("font-medium", !active);
-    nav.classList.toggle("text-[#273b44]", !active);
+    nav.classList.toggle("text-fg-2", !active);
     if (active && (view === "analysis" || view === "visualizer" || view === "lyrics" || (view === "playlists" && !selectedPlaylistId))) nav.setAttribute("aria-current", "page");
     else nav.removeAttribute("aria-current");
     panel.classList.toggle("hidden", !active);
@@ -620,9 +622,9 @@ function render() {
   for (const mode of ["artist", "album", "track"]) {
     const nav = elements[`nav-${mode}`];
     const active = currentView === "library" && libraryMode === mode;
-    nav.classList.toggle("bg-[#e1eee8]", active);
+    nav.classList.toggle("bg-sel", active);
     nav.classList.toggle("font-semibold", active);
-    nav.classList.toggle("text-[#284f48]", active);
+    nav.classList.toggle("text-deep", active);
     if (active) nav.setAttribute("aria-current", "page");
     else nav.removeAttribute("aria-current");
   }
@@ -632,17 +634,17 @@ function render() {
     const nav = document.createElement("button");
     nav.type = "button";
     nav.dataset.playlistId = saved.id;
-    nav.className = "flex min-w-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]";
+    nav.className = "flex min-w-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-base hover:bg-tint";
     const name = document.createElement("span");
     name.className = "min-w-0 break-words";
     name.textContent = saved.name;
     const count = document.createElement("span");
-    count.className = "shrink-0 text-[#5d7079]";
+    count.className = "shrink-0 text-soft";
     count.textContent = saved.tracks.length.toLocaleString();
     nav.append(name, count);
     const active = currentView === "playlists" && selectedPlaylistId === saved.id;
     if (active) {
-      nav.classList.add("bg-[#e1eee8]", "font-semibold", "text-[#284f48]");
+      nav.classList.add("bg-sel", "font-semibold", "text-deep");
       nav.setAttribute("aria-current", "page");
     }
     nav.addEventListener("click", () => selectPlaylist(saved));
@@ -739,7 +741,7 @@ function render() {
     indicator.textContent = active ? (direction === "ascending" ? "↑" : "↓") : "↕";
     indicator.classList.toggle("opacity-50", !active);
     indicator.classList.toggle("font-bold", active);
-    indicator.classList.toggle("text-[#284f48]", active);
+    indicator.classList.toggle("text-deep", active);
   }
   const folderLabel = library ? "Change folder" : "Choose folder";
   elements["choose-folder"].setAttribute("aria-label", folderLabel);
@@ -759,7 +761,7 @@ function render() {
   if (grouped) {
     for (const [position, group] of groups.entries()) {
       const row = document.createElement("tr");
-      row.className = "cursor-pointer border-b border-[#e7ecec] hover:bg-[#f7faf9] last:border-b-0";
+      row.className = "cursor-pointer border-b border-bd-3 hover:bg-field last:border-b-0";
       const name = groupName(group.key, groupMode);
       const open = () => {
         if (artistAlbums) artistAlbum = group.key;
@@ -775,21 +777,21 @@ function render() {
       nameCell.className = "px-3 py-3";
       const nameButton = document.createElement("button");
       nameButton.type = "button";
-      nameButton.className = "block max-w-full truncate text-left font-medium text-[#263940]";
+      nameButton.className = "block max-w-full truncate text-left font-medium text-fg-2";
       nameButton.textContent = name;
       nameButton.title = name;
       nameButton.addEventListener("click", open);
       nameCell.append(nameButton);
-      row.append(trackCell(String(position + 1), "tabular-nums text-[#a3b0b4]"), nameCell);
+      row.append(trackCell(String(position + 1), "tabular-nums text-faint-2"), nameCell);
       if (albumsPage) {
         const artistLabel = groupArtistLabel(group);
-        row.append(trackCell(artistLabel, "text-[#5d7079]"));
+        row.append(trackCell(artistLabel, "text-soft"));
       }
-      if (groupMode === "artist") row.append(trackCell(group.albums.size.toLocaleString(), "text-right tabular-nums text-[#5d7079]"));
-      if (groupMode === "album") row.append(trackCell(group.year === null ? "—" : String(group.year), "text-right tabular-nums text-[#5d7079]"));
+      if (groupMode === "artist") row.append(trackCell(group.albums.size.toLocaleString(), "text-right tabular-nums text-soft"));
+      if (groupMode === "album") row.append(trackCell(group.year === null ? "—" : String(group.year), "text-right tabular-nums text-soft"));
       row.append(
-        trackCell(group.tracks.length.toLocaleString(), "text-right tabular-nums text-[#5d7079]"),
-        trackCell(formatTotal(group.tracks), "text-right tabular-nums text-[#5d7079]")
+        trackCell(group.tracks.length.toLocaleString(), "text-right tabular-nums text-soft"),
+        trackCell(formatTotal(group.tracks), "text-right tabular-nums text-soft")
       );
       const paths = group.tracks.map(track => track.path);
       const missing = paths.filter(path => !playlistPaths().includes(path));
@@ -810,7 +812,7 @@ function render() {
     }
   } else filtered.forEach((track, position) => {
     const row = document.createElement("tr");
-    row.className = "border-b border-[#e7ecec] hover:bg-[#f7faf9] last:border-b-0";
+    row.className = "border-b border-bd-3 hover:bg-field last:border-b-0";
     const added = playlistPaths().includes(track.path);
     const actions = document.createElement("div");
     actions.className = "flex justify-end gap-2";
@@ -824,12 +826,12 @@ function render() {
     actionCell.className = "px-3 py-1";
     actionCell.append(actions);
     row.append(
-      trackCell(String(position + 1), "tabular-nums text-[#a3b0b4]"),
-      trackCell(Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? String(track.trackNumber) : "—", "tabular-nums text-[#5d7079]"),
-      trackCell(track.title, "font-medium text-[#263940]"),
-      ...(hideTrackArtist ? [] : [trackCell(track.artist || "Unknown artist", "text-[#5d7079]")]),
-      ...(hideTrackAlbum ? [] : [trackCell(track.album || "Unknown album", "text-[#5d7079]")]),
-      trackCell(formatDuration(track.duration), "text-right tabular-nums text-[#5d7079]"),
+      trackCell(String(position + 1), "tabular-nums text-faint-2"),
+      trackCell(Number.isSafeInteger(track.trackNumber) && track.trackNumber > 0 ? String(track.trackNumber) : "—", "tabular-nums text-soft"),
+      trackCell(track.title, "font-medium text-fg-2"),
+      ...(hideTrackArtist ? [] : [trackCell(track.artist || "Unknown artist", "text-soft")]),
+      ...(hideTrackAlbum ? [] : [trackCell(track.album || "Unknown album", "text-soft")]),
+      trackCell(formatDuration(track.duration), "text-right tabular-nums text-soft"),
       actionCell
     );
     elements["track-rows"].append(row);
@@ -889,7 +891,7 @@ function render() {
       setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || track.path, track.trackNumber ?? currentTrack?.trackNumber);
       row.addEventListener("dblclick", () => playSavedTrack(selected, track.path));
       row.tabIndex = 0;
-      row.classList.add("focus-visible:outline", "focus-visible:outline-2", "focus-visible:-outline-offset-2", "focus-visible:outline-[#315e55]");
+      row.classList.add("focus-visible:outline", "focus-visible:outline-2", "focus-visible:-outline-offset-2", "focus-visible:outline-primary");
       row.addEventListener("keydown", event => {
         if (event.target === row && event.key === "Delete" && !busy) removeSavedTrack(selected, index);
       });
@@ -932,7 +934,7 @@ function render() {
   elements.playlist.replaceChildren();
   paths.forEach((path, index) => {
     const track = trackFor(path);
-    const row = itemRow(index, track?.title || path, track ? track.artist || "Unknown artist" : "Not found in library", track ? formatDuration(track.duration) : "", "select-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#315e55]");
+    const row = itemRow(index, track?.title || path, track ? track.artist || "Unknown artist" : "Not found in library", track ? formatDuration(track.duration) : "", "select-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary");
     row.dataset.path = path;
     row.tabIndex = 0;
     row.addEventListener("dblclick", event => {
@@ -959,30 +961,30 @@ function render() {
 // One playlist line: index, "title · subtitle" and a right-aligned time.
 function itemRow(index, titleText, metaText, timeText, extraClass = "") {
   const row = document.createElement("div");
-  row.className = `flex items-center gap-3 border-b border-[#e7ecec] px-4 py-2 text-sm last:border-b-0 hover:bg-[#f1f6f4] ${extraClass}`;
+  row.className = `flex items-center gap-3 border-b border-bd-3 px-4 py-2 text-sm last:border-b-0 hover:bg-subtle ${extraClass}`;
   const number = document.createElement("span");
-  number.className = "w-6 shrink-0 tabular-nums text-[#a3b0b4]";
+  number.className = "w-6 shrink-0 tabular-nums text-faint-2";
   number.textContent = String(index + 1);
   const details = document.createElement("div");
   details.className = "flex min-w-0 flex-1 items-baseline gap-2";
   const title = document.createElement("span");
   title.dataset.title = "";
-  title.className = "max-w-[55%] shrink-0 truncate font-semibold text-[#263940]";
+  title.className = "max-w-[55%] shrink-0 truncate font-semibold text-fg-2";
   title.textContent = titleText;
   const parts = [].concat(metaText);
   details.append(title);
   parts.forEach((part, i) => {
     const separator = document.createElement("span");
-    separator.className = "shrink-0 text-[#a3b0b4]";
+    separator.className = "shrink-0 text-faint-2";
     separator.setAttribute("aria-hidden", "true");
     separator.textContent = "·";
     const meta = document.createElement("span");
-    meta.className = i === parts.length - 1 ? "min-w-0 flex-1 truncate text-[#5d7079]" : "shrink-0 text-[#5d7079]";
+    meta.className = i === parts.length - 1 ? "min-w-0 flex-1 truncate text-soft" : "shrink-0 text-soft";
     meta.textContent = part;
     details.append(separator, meta);
   });
   const time = document.createElement("span");
-  time.className = "shrink-0 tabular-nums text-[#5d7079]";
+  time.className = "shrink-0 tabular-nums text-soft";
   time.textContent = timeText;
   row.append(number, details, time);
   return row;
@@ -1047,7 +1049,7 @@ function renderGenerateOptions() {
     option.id = `generate-option-${minutes}`;
     option.setAttribute("role", "option");
     option.dataset.minutes = minutes;
-    option.className = "group flex cursor-pointer items-center justify-between gap-4 py-1.5 pl-3 pr-2 tabular-nums hover:bg-[#f1f6f4] aria-selected:bg-[#edf5f1] aria-selected:font-semibold aria-selected:text-[#284f48]";
+    option.className = "group flex cursor-pointer items-center justify-between gap-4 py-1.5 pl-3 pr-2 tabular-nums hover:bg-subtle aria-selected:bg-tint aria-selected:font-semibold aria-selected:text-deep";
     option.innerHTML = `<span>${minutes} min</span><svg aria-hidden="true" class="invisible h-4 w-4 group-aria-selected:visible"><use href="#icon-added"></use></svg>`;
     return option;
   }));
@@ -1109,7 +1111,7 @@ function stepGenerateMinutes(direction) {
 
 function hideContextMenu() {
   elements["context-menu"].classList.add("hidden");
-  contextRow?.classList.remove("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
+  contextRow?.classList.remove("outline", "outline-2", "-outline-offset-2", "outline-primary");
   contextRow = null;
   contextRemove = null;
 }
@@ -1118,7 +1120,7 @@ function openContextMenu(row, onRemove, event) {
   hideContextMenu();
   contextRow = row;
   contextRemove = onRemove;
-  row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-[#315e55]");
+  row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-primary");
   const menu = elements["context-menu"];
   menu.classList.remove("hidden");
   const keyboard = event.clientX === 0 && event.clientY === 0;
@@ -1564,9 +1566,9 @@ elements["reset-library"].addEventListener("click", () => {
   if (confirm("Reset the library? This forgets the folder, its index and the current playlist. Saved playlists are kept.")) resetLibrary();
 });
 
-const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-[#315e55]", "!animate-none"];
+const dropActive = ["scale-[2]", "border-2", "border-dashed", "!border-primary", "!animate-none"];
 // Extra emphasis while the drag is over the button itself, i.e. a drop would land.
-const dropHover = ["!border-solid", "!bg-[#d3e6dc]", "!text-[#284f48]", "ring-4", "ring-[#315e55]/20"];
+const dropHover = ["!border-solid", "!bg-accent-soft", "!text-deep", "ring-4", "ring-primary/20"];
 
 const dragHasFiles = event => [...(event.dataTransfer?.types || [])].includes("Files");
 const canDropFolder = () => !busy && "showDirectoryPicker" in window && "getAsFileSystemHandle" in DataTransferItem.prototype;
@@ -1617,7 +1619,7 @@ function placeDropLabel(target, node, hovered) {
     document.body.append(target.label);
   }
   const label = target.label;
-  label.className = `pointer-events-none fixed z-50 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium shadow-sm transition-colors ${hovered ? "bg-[#315e55] text-white" : "border border-[#c9dfd3] bg-[#f2f8ee] text-[#284f48]"}`;
+  label.className = `pointer-events-none fixed z-50 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium shadow-sm transition-colors ${hovered ? "bg-primary text-on-primary" : "border border-bd-ok bg-ok-soft text-deep"}`;
   const bounds = node.getBoundingClientRect();
   const left = bounds.left + bounds.width / 2 - label.offsetWidth / 2;
   label.style.left = `${Math.max(4, Math.min(left, window.innerWidth - label.offsetWidth - 4))}px`;
@@ -2125,5 +2127,22 @@ async function init() {
   restoreSession();
 }
 
+initTheme();
+initSnow();
+const themeButtons = [...document.querySelectorAll("[data-theme-option]")];
+function renderThemeSwitch() {
+  for (const button of themeButtons) button.setAttribute("aria-pressed", String(button.dataset.themeOption === currentPreference()));
+}
+for (const button of themeButtons) button.addEventListener("click", () => setPreference(button.dataset.themeOption));
+document.addEventListener("themechange", renderThemeSwitch);
+const snowToggle = $("snow-toggle");
+function renderSnowToggle() {
+  snowToggle.setAttribute("aria-pressed", String(snowEnabled()));
+  snowToggle.title = snowEnabled() ? "Turn snowfall off" : "Turn snowfall on";
+}
+snowToggle.addEventListener("click", () => setSnowEnabled(!snowEnabled()));
+document.addEventListener("snowchange", renderSnowToggle);
+renderSnowToggle();
+renderThemeSwitch();
 initTooltips();
 init();
