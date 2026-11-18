@@ -4,10 +4,6 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#202c28",
-        muted: "#75817a",
-        canvas: "#f6f7f3",
-        line: "#e7ebe4",
         "page": "rgb(var(--c-page) / <alpha-value>)",
         "surface": "rgb(var(--c-surface) / <alpha-value>)",
         "head": "rgb(var(--c-head) / <alpha-value>)",
