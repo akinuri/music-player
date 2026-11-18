@@ -4,11 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#e6eaed">
+    <script>
+      // Applies the saved theme before first paint to avoid a flash of the wrong one (keep in sync with src/theme.js).
+      (function () {
+        var preference = "system";
+        try { preference = localStorage.getItem("theme") || "system"; } catch (error) {}
+        var dark = preference === "dark" || (preference !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.classList.toggle("dark", dark);
+        root.dataset.theme = dark ? "dark" : "light";
+        if (dark) document.querySelector('meta[name="theme-color"]').setAttribute("content", "#0f1517");
+      })();
+    </script>
     <title>Music player</title>
     <link rel="stylesheet" href="./dist/styles.css">
     <script type="module" src="./dist/app.js"></script>
   </head>
-  <body class="bg-[#e9eeee] text-[#202c35] antialiased">
+  <body class="bg-page text-fg antialiased">
     <svg aria-hidden="true" class="absolute h-0 w-0 overflow-hidden" xmlns="http://www.w3.org/2000/svg">
       <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></symbol>
       <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM14 5h4v14h-4z" fill="currentColor"/></symbol>
@@ -25,6 +37,9 @@
       <symbol id="icon-rename" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-remove" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="icon-clear" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-theme-light" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-theme-dark" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-theme-system" viewBox="0 0 24 24"><path d="M4 5h16v11H4zM9 20h6M12 16v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 19V5h7l2 2h9v12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-rescan" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 9a7 7 0 0 1 12-2l3 5M19 15a7 7 0 0 1-12 2l-3-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-reconnect" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -35,56 +50,61 @@
     <main class="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-4 px-4 pb-12 pt-5 sm:px-6 lg:h-screen lg:min-h-0 lg:px-8">
       <div id="notice" class="hidden">
         <div id="notice-content" role="status" aria-live="polite" class="min-w-0 flex-1"></div>
-        <button id="dismiss-notice" type="button" aria-label="Dismiss notification" title="Dismiss" class="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-black/5"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-remove"></use></svg></button>
-        <div id="notice-progress" aria-hidden="true" class="absolute bottom-0 right-0 hidden h-[3px] w-full bg-[#315e55]/50"></div>
+        <button id="dismiss-notice" type="button" aria-label="Dismiss notification" title="Dismiss" class="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-overlay/5"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-remove"></use></svg></button>
+        <div id="notice-progress" aria-hidden="true" class="absolute bottom-0 right-0 hidden h-[3px] w-full bg-primary/50"></div>
       </div>
       <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <aside class="flex shrink-0 self-stretch flex-col gap-4 lg:max-h-full lg:w-[200px] lg:self-start">
-          <nav class="flex min-h-0 flex-col rounded-xl border border-[#d6e0df] bg-white px-3 py-4 text-[#273b44] shadow-sm" aria-label="Music navigation">
+          <nav class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-3 py-4 text-fg-2 shadow-sm" aria-label="Music navigation">
             <div class="flex min-h-0 flex-col gap-1 lg:overflow-y-auto">
-              <button id="nav-library" type="button" class="flex min-w-0 items-center justify-between rounded-md bg-[#e1eee8] px-2.5 py-2 text-left text-base font-semibold text-[#284f48] hover:bg-[#d3e6dc]"><span>Library</span><span id="track-count" class="ml-2 text-[#46685f]">0</span></button>
-              <div class="ml-3 flex flex-col gap-1 border-l border-[#d6e0df] pl-2">
-                <button id="nav-artist" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]"><span>Artists</span><span id="artist-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
-                <button id="nav-album" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]"><span>Albums</span><span id="album-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
-                <button id="nav-track" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-[#edf5f1]"><span>Tracks</span><span id="track-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
+              <button id="nav-library" type="button" class="flex min-w-0 items-center justify-between rounded-md bg-sel px-2.5 py-2 text-left text-base font-semibold text-deep hover:bg-accent-soft"><span>Library</span><span id="track-count" class="ml-2 text-deep-2">0</span></button>
+              <div class="ml-3 flex flex-col gap-1 border-l border-bd pl-2">
+                <button id="nav-artist" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-tint"><span>Artists</span><span id="artist-nav-count" class="ml-2 text-soft">0</span></button>
+                <button id="nav-album" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-tint"><span>Albums</span><span id="album-nav-count" class="ml-2 text-soft">0</span></button>
+                <button id="nav-track" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base hover:bg-tint"><span>Tracks</span><span id="track-nav-count" class="ml-2 text-soft">0</span></button>
               </div>
-              <button id="nav-playlists" type="button" class="mt-2 flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Playlists</span><span id="playlist-nav-count" class="ml-2 text-[#5d7079]">0</span></button>
-              <div id="playlist-nav-items" class="ml-3 flex flex-col gap-1 border-l border-[#d6e0df] pl-2"></div>
+              <button id="nav-playlists" type="button" class="mt-2 flex min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Playlists</span><span id="playlist-nav-count" class="ml-2 text-soft">0</span></button>
+              <div id="playlist-nav-items" class="ml-3 flex flex-col gap-1 border-l border-bd pl-2"></div>
             </div>
           </nav>
-          <nav class="flex shrink-0 flex-col gap-1 rounded-xl border border-[#d6e0df] bg-white px-3 py-3 text-[#273b44] shadow-sm" aria-label="Apps">
-            <button id="nav-visualizer" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Visualizer</span></button>
-            <button id="nav-lyrics" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Lyrics</span></button>
-            <button id="nav-analysis" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-[#273b44] hover:bg-[#edf5f1]"><span>Analysis</span></button>
+          <nav class="flex shrink-0 flex-col gap-1 rounded-xl border border-bd bg-surface px-3 py-3 text-fg-2 shadow-sm" aria-label="Apps">
+            <button id="nav-visualizer" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Visualizer</span></button>
+            <button id="nav-lyrics" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Lyrics</span></button>
+            <button id="nav-analysis" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-2 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Analysis</span></button>
           </nav>
           <div class="flex shrink-0 flex-wrap items-center gap-2 px-1">
-            <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#284f48] bg-[#315e55] text-white shadow-sm hover:bg-[#284f48] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
-            <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 origin-center items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm transition-transform duration-150 hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
-            <button id="rescan" type="button" aria-label="Rescan library" title="Rescan library" disabled class="flex h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-rescan"></use></svg></button>
-            <button id="reset-library" type="button" aria-label="Reset library" title="Reset library" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#bdcbcc] bg-[#f7faf9] text-[#273b44] shadow-sm hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-clear"></use></svg></button>
+            <button id="reconnect" type="button" aria-label="Reconnect folder" title="Reconnect folder" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-primary-dark bg-primary text-on-primary shadow-sm hover:bg-primary-dark disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-reconnect"></use></svg></button>
+            <button id="choose-folder" type="button" aria-label="Choose folder" title="Choose folder" class="flex h-10 w-10 origin-center items-center justify-center rounded-lg border border-bd-in bg-field text-fg-2 shadow-sm transition-transform duration-150 hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-folder"></use></svg></button>
+            <button id="rescan" type="button" aria-label="Rescan library" title="Rescan library" disabled class="flex h-10 w-10 items-center justify-center rounded-lg border border-bd-in bg-field text-fg-2 shadow-sm hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-rescan"></use></svg></button>
+            <button id="reset-library" type="button" aria-label="Reset library" title="Reset library" class="hidden h-10 w-10 items-center justify-center rounded-lg border border-bd-in bg-field text-fg-2 shadow-sm hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-clear"></use></svg></button>
+          </div>
+          <div id="theme-switch" role="group" aria-label="Theme" class="flex w-fit shrink-0 overflow-hidden rounded-lg border border-bd-in bg-field shadow-sm">
+            <button type="button" data-theme-option="light" aria-label="Light theme" title="Light theme" aria-pressed="false" class="flex h-9 w-9 items-center justify-center text-fg-2 hover:bg-tint-2 aria-pressed:bg-accent-soft aria-pressed:text-deep"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-theme-light"></use></svg></button>
+            <button type="button" data-theme-option="dark" aria-label="Dark theme" title="Dark theme" aria-pressed="false" class="flex h-9 w-9 items-center justify-center border-l border-bd-in text-fg-2 hover:bg-tint-2 aria-pressed:bg-accent-soft aria-pressed:text-deep"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-theme-dark"></use></svg></button>
+            <button type="button" data-theme-option="system" aria-label="Match system theme" title="Match system theme" aria-pressed="false" class="flex h-9 w-9 items-center justify-center border-l border-bd-in text-fg-2 hover:bg-tint-2 aria-pressed:bg-accent-soft aria-pressed:text-deep"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-theme-system"></use></svg></button>
           </div>
         </aside>
 
-        <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="library-heading">
-          <div class="border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+        <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
+          <div class="border-b border-bd-2 px-4 py-4 sm:px-6">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
               <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
               <div id="library-meta" class="flex flex-wrap gap-2 text-sm"></div>
-              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="ml-auto min-w-[10rem] flex-1 rounded-md border border-[#cbd6d9] bg-[#f7f9f9] px-3 py-1.5 text-base outline-none placeholder:text-[#798a90] focus:border-[#315e55] focus:bg-white sm:max-w-xs">
+              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="ml-auto min-w-[10rem] flex-1 rounded-md border border-bd-in bg-field px-3 py-1.5 text-base outline-none placeholder:text-faint focus:border-primary focus:bg-surface sm:max-w-xs">
             </div>
           </div>
           <div class="max-h-80 overflow-auto lg:max-h-none lg:flex-1">
             <table id="groups-table" class="hidden w-full min-w-[480px] table-fixed border-collapse text-base">
               <colgroup><col class="w-16"><col><col id="group-artist-col" class="hidden w-40"><col id="group-albums-col" class="w-24"><col id="group-year-col" class="hidden w-20"><col class="w-24"><col class="w-32"><col class="w-24"></colgroup>
-              <thead class="sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]">
-                <tr class="border-b border-[#e1e9e7]">
+              <thead class="sticky top-0 z-10 bg-head text-soft">
+                <tr class="border-b border-bd-2">
                   <th scope="col" class="px-3 py-2.5 text-left">#</th>
-                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-group-sort="name" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span id="group-name-heading">Artist</span><span data-sort-indicator aria-hidden="true">↑</span></button></th>
-                  <th id="group-artist-heading" scope="col" class="hidden px-3 py-2.5 text-left"><button type="button" data-group-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Artist</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th id="group-albums-heading" scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="albums" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Albums</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th id="group-year-heading" scope="col" class="hidden px-3 py-2.5 text-right"><button type="button" data-group-sort="year" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Year</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="tracks" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Tracks</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Time</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-group-sort="name" class="flex w-full items-center gap-2 text-left hover:text-deep"><span id="group-name-heading">Artist</span><span data-sort-indicator aria-hidden="true">↑</span></button></th>
+                  <th id="group-artist-heading" scope="col" class="hidden px-3 py-2.5 text-left"><button type="button" data-group-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th id="group-albums-heading" scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="albums" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Albums</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th id="group-year-heading" scope="col" class="hidden px-3 py-2.5 text-right"><button type="button" data-group-sort="year" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Year</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="tracks" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Tracks</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Time</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -92,14 +112,14 @@
             </table>
             <table id="tracks-table" class="w-full min-w-[480px] table-fixed border-collapse text-base">
               <colgroup><col class="w-14"><col class="w-20"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-20"><col class="w-24"></colgroup>
-              <thead class="sticky top-0 z-10 bg-[#f5f8f7] text-[#5d7079]">
-                <tr class="border-b border-[#e1e9e7]">
+              <thead class="sticky top-0 z-10 bg-head text-soft">
+                <tr class="border-b border-bd-2">
                   <th scope="col" class="px-3 py-2.5 text-left">#</th>
-                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span aria-hidden="true">Track</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th scope="col" aria-sort="ascending" class="px-3 py-2.5 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-[#284f48]">↑</span></button></th>
-                  <th id="track-artist-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th id="track-album-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-[#284f48]"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-[#284f48]"><span>Time</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-deep"><span aria-hidden="true">Track</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" aria-sort="ascending" class="px-3 py-2.5 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-deep">↑</span></button></th>
+                  <th id="track-artist-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th id="track-album-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Time</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
                   <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -107,138 +127,139 @@
             </table>
             <div id="empty" class="px-5 py-12 text-center">
               <h3 id="empty-title" class="text-base font-medium">No folder selected</h3>
-              <p id="empty-description" class="mt-1 text-base text-[#5d7079]">Choose a folder to index your MP3 files. Files are not uploaded.</p>
+              <p id="empty-description" class="mt-1 text-base text-soft">Choose a folder to index your MP3 files. Files are not uploaded.</p>
             </div>
           </div>
         </section>
 
-        <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="saved-playlists-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+        <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
             <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
             <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
             <div id="saved-actions" class="ml-auto flex shrink-0 gap-1"></div>
             <input id="import-file" type="file" accept=".json,application/json" multiple class="hidden">
           </div>
-          <form id="rename-form" class="hidden border-b border-[#e1e9e7] px-4 py-3 sm:px-6">
+          <form id="rename-form" class="hidden border-b border-bd-2 px-4 py-3 sm:px-6">
             <label for="rename-input" class="sr-only">Playlist name</label>
             <div class="flex gap-2">
-              <input id="rename-input" type="text" required maxlength="120" class="min-w-0 flex-1 rounded-md border border-[#cbd6d9] px-3 py-2 text-base outline-none focus:border-[#315e55]">
-              <button id="rename-submit" type="submit" aria-label="Save new name" title="Rename" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
-              <button id="rename-cancel" type="button" aria-label="Cancel renaming" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
+              <input id="rename-input" type="text" required maxlength="120" class="min-w-0 flex-1 rounded-md border border-bd-in px-3 py-2 text-base outline-none focus:border-primary">
+              <button id="rename-submit" type="submit" aria-label="Save new name" title="Rename" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-bd-acc bg-accent-soft text-deep hover:bg-accent-soft-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
+              <button id="rename-cancel" type="button" aria-label="Cancel renaming" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
             </div>
           </form>
           <div class="max-h-80 overflow-y-auto lg:max-h-none lg:flex-1">
             <div id="saved-playlists"></div>
-            <p id="saved-empty" class="px-5 py-12 text-center text-base text-[#5d7079]">Save the current playlist or import one to see it here.</p>
+            <p id="saved-empty" class="px-5 py-12 text-center text-base text-soft">Save the current playlist or import one to see it here.</p>
           </div>
         </section>
 
-        <section id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="analysis-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+        <section id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
             <h2 id="analysis-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="analysis-title" class="flex flex-wrap items-center gap-x-1.5">Analysis</span></h2>
             <div id="analysis-meta" class="flex flex-wrap gap-2 text-sm"></div>
-            <div role="group" aria-label="Timeline measure" class="ml-auto flex overflow-hidden rounded-md border border-[#becbd0] text-sm">
+            <div role="group" aria-label="Timeline measure" class="ml-auto flex overflow-hidden rounded-md border border-bd-in text-sm">
               <button id="analysis-albums" type="button" class="px-3 py-1.5">Albums</button>
-              <button id="analysis-tracks" type="button" class="border-l border-[#becbd0] px-3 py-1.5">Tracks</button>
+              <button id="analysis-tracks" type="button" class="border-l border-bd-in px-3 py-1.5">Tracks</button>
             </div>
           </div>
-          <div id="analysis-empty" class="hidden px-5 py-12 text-center text-base text-[#5d7079]"></div>
+          <div id="analysis-empty" class="hidden px-5 py-12 text-center text-base text-soft"></div>
           <div id="analysis-body" class="flex min-h-0 flex-1 flex-col">
-            <div id="analysis-chart" class="flex h-64 shrink-0 gap-1 overflow-x-auto border-b border-[#e1e9e7] px-4 pt-4 sm:px-6"></div>
+            <div id="analysis-chart" class="flex h-64 shrink-0 gap-1 overflow-x-auto border-b border-bd-2 px-4 pt-4 sm:px-6"></div>
             <div id="analysis-detail" class="min-h-0 flex-1 overflow-y-auto"></div>
           </div>
         </section>
 
-        <section id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="visualizer-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+        <section id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
             <h2 id="visualizer-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Visualizer</h2>
           </div>
           <div class="relative min-h-[260px] flex-1">
             <canvas id="visualizer-canvas" class="absolute left-2 top-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] sm:left-4 sm:w-[calc(100%-2rem)]" aria-hidden="true"></canvas>
-            <p id="visualizer-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-[#5d7079]">Play a track to see it here.</p>
+            <p id="visualizer-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-soft">Play a track to see it here.</p>
           </div>
         </section>
 
-        <section id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm" aria-labelledby="lyrics-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#e1e9e7] px-4 py-4 sm:px-6">
+        <section id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
             <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
             <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
           </div>
           <div id="lyrics-body" class="relative flex min-h-[260px] max-h-[70vh] flex-1 flex-col py-6 pl-4 pr-2 sm:pl-6 lg:max-h-none lg:min-h-0">
             <div id="lyrics-lines" class="-ml-2 min-h-0 flex-1 overflow-y-auto pl-2 pr-4 text-lg leading-relaxed"></div>
-            <p id="lyrics-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-[#5d7079]">Play a track to see its lyrics.</p>
+            <p id="lyrics-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-soft">Play a track to see its lyrics.</p>
           </div>
         </section>
 
         <div class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[340px] xl:w-[400px] 2xl:w-[440px] lg:shrink-0 lg:overflow-y-auto">
-          <section class="shrink-0 rounded-xl border border-[#d6e0df] bg-white p-5 shadow-sm" aria-label="Playback controls">
+          <section class="shrink-0 rounded-xl border border-bd bg-surface p-5 shadow-sm" aria-label="Playback controls">
             <div class="min-w-0">
-              <p id="now-playing" class="h-6 truncate text-base font-semibold text-[#263940]">Nothing playing</p>
-              <p id="now-artist" class="mt-1 h-6 truncate text-base text-[#5d7079]"></p>
+              <p id="now-playing" class="h-6 truncate text-base font-semibold text-fg-2">Nothing playing</p>
+              <p id="now-artist" class="mt-1 h-6 truncate text-base text-soft"></p>
             </div>
-            <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-[#5d7079]">
+            <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-soft">
               <span id="elapsed" class="w-10 shrink-0">0:00</span>
-              <label for="seek" class="sr-only">Playback position</label><input id="seek" type="range" min="0" max="0" value="0" step="0.1" disabled class="min-w-0 flex-1 accent-[#315e55]">
+              <label for="seek" class="sr-only">Playback position</label><input id="seek" type="range" min="0" max="0" value="0" step="0.1" disabled class="min-w-0 flex-1 accent-primary">
               <span id="playback-duration" class="w-10 shrink-0 text-right">—</span>
             </div>
             <div class="mt-4 flex items-center gap-2">
-              <button id="stop" type="button" aria-label="Stop" title="Stop" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-stop"></use></svg></button>
-              <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
-              <button id="play-pause" type="button" aria-label="Play" title="Play" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-play"></use></svg></button>
-              <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-[#cbd6d9] bg-[#f7faf9] hover:bg-[#e9f2ee] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
-              <button id="mute" type="button" aria-label="Mute" title="Mute" class="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-[#c1ced1] bg-[#f7faf9] text-[#28454a] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-volume"></use></svg></button>
-              <label for="volume" class="sr-only">Volume</label><input id="volume" type="range" min="0" max="100" step="2" value="100" class="min-w-0 flex-1 accent-[#315e55]">
-              <span id="volume-value" class="w-9 shrink-0 text-right text-sm tabular-nums text-[#5d7079]">100%</span>
+              <button id="stop" type="button" aria-label="Stop" title="Stop" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-stop"></use></svg></button>
+              <button id="previous" type="button" aria-label="Previous track" title="Previous track" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-previous"></use></svg></button>
+              <button id="play-pause" type="button" aria-label="Play" title="Play" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-bd-acc bg-accent-soft text-deep hover:bg-accent-soft-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-play"></use></svg></button>
+              <button id="next" type="button" aria-label="Next track" title="Next track" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-next"></use></svg></button>
+              <button id="mute" type="button" aria-label="Mute" title="Mute" class="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-volume"></use></svg></button>
+              <label for="volume" class="sr-only">Volume</label><input id="volume" type="range" min="0" max="100" step="2" value="100" class="min-w-0 flex-1 accent-primary">
+
+              <span id="volume-value" class="w-9 shrink-0 text-right text-sm tabular-nums text-soft">100%</span>
             </div>
           </section>
 
-          <section class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-[#d6e0df] bg-white shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
-            <div class="flex items-center justify-between gap-3 border-b border-[#e1e9e7] px-4 py-3">
+          <section class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
+            <div class="flex items-center justify-between gap-3 border-b border-bd-2 px-4 py-3">
               <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 <h2 id="playlist-heading" tabindex="-1" class="text-base font-semibold">Current playlist</h2>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <div id="playlist-stats-tabs" role="tablist" aria-label="Playlist stats" class="flex rounded-md bg-[#eef3f2] p-0.5 text-xs"><button type="button" role="tab" data-stats="total" aria-label="Total" title="Total" aria-selected="true" class="rounded px-2 py-0.5 text-[#5d7079] hover:text-[#273b44] aria-selected:bg-white aria-selected:font-medium aria-selected:text-[#284f48] aria-selected:shadow-sm">T</button><button type="button" role="tab" data-stats="elapsed" aria-label="Elapsed" title="Elapsed" aria-selected="false" class="rounded px-2 py-0.5 text-[#5d7079] hover:text-[#273b44] aria-selected:bg-white aria-selected:font-medium aria-selected:text-[#284f48] aria-selected:shadow-sm">E</button><button type="button" role="tab" data-stats="remaining" aria-label="Remaining" title="Remaining" aria-selected="false" class="rounded px-2 py-0.5 text-[#5d7079] hover:text-[#273b44] aria-selected:bg-white aria-selected:font-medium aria-selected:text-[#284f48] aria-selected:shadow-sm">R</button></div>
-                  <span id="playlist-count" class="rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]">0 Tracks</span>
-                  <span id="playlist-duration" class="rounded-md bg-[#edf5f1] px-2 py-0.5 text-[#284f48]">—</span>
+                  <div id="playlist-stats-tabs" role="tablist" aria-label="Playlist stats" class="flex rounded-md bg-tab p-0.5 text-xs"><button type="button" role="tab" data-stats="total" aria-label="Total" title="Total" aria-selected="true" class="rounded px-2 py-0.5 text-soft hover:text-fg-2 aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">T</button><button type="button" role="tab" data-stats="elapsed" aria-label="Elapsed" title="Elapsed" aria-selected="false" class="rounded px-2 py-0.5 text-soft hover:text-fg-2 aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">E</button><button type="button" role="tab" data-stats="remaining" aria-label="Remaining" title="Remaining" aria-selected="false" class="rounded px-2 py-0.5 text-soft hover:text-fg-2 aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">R</button></div>
+                  <span id="playlist-count" class="rounded-md bg-tint px-2 py-0.5 text-deep">0 Tracks</span>
+                  <span id="playlist-duration" class="rounded-md bg-tint px-2 py-0.5 text-deep">—</span>
                 </div>
               </div>
               <div class="flex shrink-0 gap-1">
-                <button id="generate-playlist" type="button" aria-label="Generate random playlist" title="Generate random playlist" disabled class="flex h-9 w-9 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-shuffle"></use></svg></button>
-                <button id="save-playlist" type="button" aria-label="Save playlist" title="Save playlist" disabled class="flex h-9 w-9 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-save"></use></svg></button>
-                <button id="clear-playlist" type="button" aria-label="Clear playlist" title="Clear playlist" disabled class="flex h-9 w-9 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee] disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-clear"></use></svg></button>
+                <button id="generate-playlist" type="button" aria-label="Generate random playlist" title="Generate random playlist" disabled class="flex h-9 w-9 items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-shuffle"></use></svg></button>
+                <button id="save-playlist" type="button" aria-label="Save playlist" title="Save playlist" disabled class="flex h-9 w-9 items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-save"></use></svg></button>
+                <button id="clear-playlist" type="button" aria-label="Clear playlist" title="Clear playlist" disabled class="flex h-9 w-9 items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-clear"></use></svg></button>
               </div>
             </div>
-            <form id="save-form" class="hidden border-b border-[#e1e9e7] px-4 py-3">
+            <form id="save-form" class="hidden border-b border-bd-2 px-4 py-3">
               <label for="playlist-name" class="block text-base font-medium">Playlist name</label>
               <div class="mt-2 flex gap-2">
-                <input id="playlist-name" type="text" required class="min-w-0 flex-1 rounded-md border border-[#cbd6d9] px-3 py-2 text-base outline-none focus:border-[#315e55]">
-                <button id="save-submit" type="submit" aria-label="Save named playlist" title="Save" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
-                <button id="save-cancel" type="button" aria-label="Cancel saving" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
+                <input id="playlist-name" type="text" required class="min-w-0 flex-1 rounded-md border border-bd-in px-3 py-2 text-base outline-none focus:border-primary">
+                <button id="save-submit" type="submit" aria-label="Save named playlist" title="Save" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-bd-acc bg-accent-soft text-deep hover:bg-accent-soft-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-save"></use></svg></button>
+                <button id="save-cancel" type="button" aria-label="Cancel saving" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
               </div>
             </form>
-            <form id="generate-form" class="hidden border-b border-[#e1e9e7] px-4 py-3">
+            <form id="generate-form" class="hidden border-b border-bd-2 px-4 py-3">
               <label for="generate-minutes" class="block text-base font-medium">Generate random tracks</label>
               <div class="mt-2 flex items-center gap-2">
-                <div id="generate-field" class="flex h-10 cursor-text w-[7.5rem] shrink-0 items-center rounded-md border border-[#cbd6d9] bg-white transition-colors focus-within:border-[#315e55] focus-within:ring-2 focus-within:ring-[#315e55]/15">
+                <div id="generate-field" class="flex h-10 cursor-text w-[7.5rem] shrink-0 items-center rounded-md border border-bd-in bg-surface transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
                   <input id="generate-minutes" type="text" inputmode="numeric" maxlength="4" value="15" required autocomplete="off" role="combobox" aria-autocomplete="none" aria-expanded="false" aria-controls="generate-options" class="min-w-0 flex-1 bg-transparent py-2 pl-3 text-base tabular-nums outline-none disabled:opacity-40">
-                  <span aria-hidden="true" class="text-sm text-[#5d7079]">min</span>
-                  <button id="generate-toggle" type="button" tabindex="-1" aria-label="Show durations" class="group ml-1 flex h-full w-7 shrink-0 items-center justify-center rounded-r-md border-l border-[#e1e9e7] text-[#5d7079] hover:bg-[#f1f6f4] hover:text-[#273b44] disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
+                  <span aria-hidden="true" class="text-sm text-soft">min</span>
+                  <button id="generate-toggle" type="button" tabindex="-1" aria-label="Show durations" class="group ml-1 flex h-full w-7 shrink-0 items-center justify-center rounded-r-md border-l border-bd-2 text-soft hover:bg-subtle hover:text-fg-2 disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
                 </div>
-                <ul id="generate-options" role="listbox" aria-label="Durations" class="fixed z-50 hidden rounded-md border border-[#d6e0df] bg-white py-1 text-sm text-[#273b44] shadow-lg"></ul>
-                <button id="generate-submit" type="submit" aria-label="Generate" title="Generate" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#abc8bb] bg-[#d3e6dc] text-[#284f48] hover:bg-[#c2ded0] disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
-                <button id="generate-cancel" type="button" aria-label="Cancel generating" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#becbd0] bg-[#f7faf9] text-[#273b44] hover:bg-[#e9f2ee]"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
+                <ul id="generate-options" role="listbox" aria-label="Durations" class="fixed z-50 hidden rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg"></ul>
+                <button id="generate-submit" type="submit" aria-label="Generate" title="Generate" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-bd-acc bg-accent-soft text-deep hover:bg-accent-soft-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-added"></use></svg></button>
+                <button id="generate-cancel" type="button" aria-label="Cancel generating" title="Cancel" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-remove"></use></svg></button>
               </div>
             </form>
             <div class="min-h-0 overflow-y-auto lg:flex-1">
               <div id="playlist"></div>
-              <p id="playlist-empty" class="px-4 py-6 text-center text-base text-[#5d7079]">Add tracks from the library to start a playlist.</p>
+              <p id="playlist-empty" class="px-4 py-6 text-center text-base text-soft">Add tracks from the library to start a playlist.</p>
             </div>
           </section>
         </div>
       </div>
     </main>
-    <div id="context-menu" role="menu" class="fixed z-50 hidden min-w-[9rem] rounded-md border border-[#d6e0df] bg-white py-1 text-sm text-[#273b44] shadow-lg">
-      <button id="context-remove" type="button" role="menuitem" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[#f1f6f4] focus-visible:bg-[#f1f6f4] focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg>Remove from playlist</button>
+    <div id="context-menu" role="menu" class="fixed z-50 hidden min-w-[9rem] rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg">
+      <button id="context-remove" type="button" role="menuitem" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg>Remove from playlist</button>
     </div>
   </body>
 </html>
