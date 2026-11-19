@@ -74,8 +74,8 @@
             <button id="nav-analysis" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Analysis</span></button>
           </nav>
           <section class="flex shrink-0 flex-col gap-1 rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-labelledby="sources-heading">
-            <div class="flex items-center justify-between gap-2">
-              <h2 id="sources-heading" class="min-w-0"><button id="sources-toggle" type="button" aria-expanded="true" aria-controls="sources-body" class="group flex min-w-0 items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-sm font-semibold text-fg hover:bg-tint"><svg aria-hidden="true" class="h-4 w-4 shrink-0 text-soft transition-transform group-aria-[expanded=false]:-rotate-90"><use href="#icon-chevron"></use></svg>Sources<span id="sources-count" class="hidden rounded px-1.5 text-xs font-medium"></span></button></h2>
+            <div id="sources-header" class="-mx-2 -mt-2 flex items-center justify-between gap-2 rounded-t-[11px] border-b border-bd-2 bg-head px-2 py-1.5">
+              <h2 id="sources-heading" class="min-w-0"><button id="sources-toggle" type="button" aria-expanded="true" aria-controls="sources-body" class="group flex min-w-0 items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-sm font-semibold text-fg hover:bg-sel"><svg aria-hidden="true" class="h-4 w-4 shrink-0 text-soft transition-transform group-aria-[expanded=false]:-rotate-90"><use href="#icon-chevron"></use></svg>Sources<span id="sources-count" class="hidden rounded px-1.5 text-xs font-medium"></span></button></h2>
               <button id="choose-folder" type="button" aria-label="Add folder" title="Add folder" class="flex h-8 w-8 origin-center items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 shadow-sm transition-transform duration-150 hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-folder-add"></use></svg></button>
             </div>
             <p id="sources-empty" class="px-1.5 text-sm text-soft">Add a music folder, or drop one on the button.</p>
@@ -99,7 +99,7 @@
         </aside>
 
         <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
-          <div class="border-b border-bd-2 px-4 py-4 sm:px-6">
+          <div class="border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
               <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
               <div id="library-meta" class="flex flex-wrap gap-2 text-sm"></div>
@@ -148,7 +148,7 @@
         </section>
 
         <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
             <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
             <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
             <div id="saved-actions" class="ml-auto flex shrink-0 gap-1"></div>
@@ -169,7 +169,7 @@
         </section>
 
         <section id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
             <h2 id="analysis-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="analysis-title" class="flex flex-wrap items-center gap-x-1.5">Analysis</span></h2>
             <div id="analysis-meta" class="flex flex-wrap gap-2 text-sm"></div>
             <div role="group" aria-label="Timeline measure" class="ml-auto flex overflow-hidden rounded-md border border-bd-in text-sm">
@@ -185,7 +185,7 @@
         </section>
 
         <section id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
             <h2 id="visualizer-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Visualizer</h2>
           </div>
           <div class="relative min-h-[260px] flex-1">
@@ -195,7 +195,7 @@
         </section>
 
         <section id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
             <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
             <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
           </div>
@@ -229,13 +229,13 @@
           </section>
 
           <section class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
-            <div class="flex items-center justify-between gap-3 border-b border-bd-2 px-4 py-3">
+            <div class="flex items-center justify-between gap-3 border-b border-bd-2 bg-head px-4 py-3">
               <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 <h2 id="playlist-heading" tabindex="-1" class="text-base font-semibold">Current playlist</h2>
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <div id="playlist-stats-tabs" role="tablist" aria-label="Playlist stats" class="flex rounded-md bg-tab p-0.5 text-xs"><button type="button" role="tab" data-stats="total" aria-label="Total" title="Total" aria-selected="true" class="rounded px-2 py-0.5 text-soft hover:text-fg-2 aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">T</button><button type="button" role="tab" data-stats="elapsed" aria-label="Elapsed" title="Elapsed" aria-selected="false" class="rounded px-2 py-0.5 text-soft hover:text-fg-2 aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">E</button><button type="button" role="tab" data-stats="remaining" aria-label="Remaining" title="Remaining" aria-selected="false" class="rounded px-2 py-0.5 text-soft hover:text-fg-2 aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">R</button></div>
-                  <span id="playlist-count" class="rounded-md bg-tint px-2 py-0.5 text-deep">0 Tracks</span>
-                  <span id="playlist-duration" class="rounded-md bg-tint px-2 py-0.5 text-deep">—</span>
+                  <div id="playlist-stats-tabs" role="tablist" aria-label="Playlist stats" class="flex rounded-md bg-sel p-0.5 text-xs"><button type="button" role="tab" data-stats="total" aria-label="Total" title="Total" aria-selected="true" class="rounded px-2 py-0.5 text-fg-2 hover:text-fg aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">T</button><button type="button" role="tab" data-stats="elapsed" aria-label="Elapsed" title="Elapsed" aria-selected="false" class="rounded px-2 py-0.5 text-fg-2 hover:text-fg aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">E</button><button type="button" role="tab" data-stats="remaining" aria-label="Remaining" title="Remaining" aria-selected="false" class="rounded px-2 py-0.5 text-fg-2 hover:text-fg aria-selected:bg-surface aria-selected:font-medium aria-selected:text-deep aria-selected:shadow-sm">R</button></div>
+                  <span id="playlist-count" class="rounded-md bg-accent-soft px-2 py-0.5 text-deep">0 Tracks</span>
+                  <span id="playlist-duration" class="rounded-md bg-accent-soft px-2 py-0.5 text-deep">—</span>
                 </div>
               </div>
               <div class="flex shrink-0 gap-1">
