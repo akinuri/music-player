@@ -118,17 +118,19 @@ const contentsText = source => source.contents?.names.length ? `${source.content
 // Whether another source has the same name, so the contents are needed to tell them apart.
 const nameClashes = source => (library?.sources || []).some(other => other.id !== source.id && other.name.toLocaleLowerCase() === source.name.toLocaleLowerCase());
 
-// Chrome can leave queryPermission pending (seen after a restart, on a hosted origin),
-// which used to stall startup with the app stuck busy; past the timeout the folder counts as locked.
+// Chrome can leave folder-handle calls (queryPermission, requestPermission, isSameEntry) pending
+// for a site whose stored permissions it has wedged (seen after a restart, on GitHub Pages).
 const PERMISSION_TIMEOUT = 3000;
+const withTimeout = (promise, ms, message) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+]);
+const STUCK_ACCESS_HELP = "Chrome isn't answering folder-access requests for this site. Click the lock icon in the address bar → Site settings → Reset permissions, then reload. Or add the folder again with the folder button.";
 
 async function checkPermission(source) {
   let state = "prompt";
   try {
-    state = await Promise.race([
-      source.handle.queryPermission({ mode: "read" }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out checking folder access.")), PERMISSION_TIMEOUT))
-    ]);
+    state = await withTimeout(source.handle.queryPermission({ mode: "read" }), PERMISSION_TIMEOUT, "Timed out checking folder access.");
   } catch (error) {
     console.error(`Could not check access to "${source.name}":`, error);
   }
@@ -1792,7 +1794,7 @@ async function addFolders(handles) {
     let existing = null;
     for (const source of [...(library?.sources || []), ...targets]) {
       try {
-        if (await source.handle.isSameEntry(handle)) {
+        if (await withTimeout(source.handle.isSameEntry(handle), PERMISSION_TIMEOUT, "Timed out comparing folders.")) {
           existing = source;
           break;
         }
@@ -1808,12 +1810,18 @@ async function addFolders(handles) {
 
 async function reconnectSources(sources) {
   if (busy || !sources.length) return;
-  for (const source of sources) {
-    try {
-      permissions.set(source.id, await source.handle.requestPermission({ mode: "read" }));
-    } catch (error) {
-      console.error(`Could not reconnect "${source.name}":`, error);
+  // A permission prompt can legitimately stay open a while, so this only explains a silent wait.
+  const stuckTimer = setTimeout(() => notice(STUCK_ACCESS_HELP, true, [], { sticky: true }), 5000);
+  try {
+    for (const source of sources) {
+      try {
+        permissions.set(source.id, await source.handle.requestPermission({ mode: "read" }));
+      } catch (error) {
+        console.error(`Could not reconnect "${source.name}":`, error);
+      }
     }
+  } finally {
+    clearTimeout(stuckTimer);
   }
   render();
   const missing = sources.filter(source => permissionOf(source) !== "granted");
