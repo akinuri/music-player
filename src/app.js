@@ -434,7 +434,7 @@ function renderSources() {
   elements["sources-list"].replaceChildren(...sources.map(source => {
     const granted = permissionOf(source) === "granted";
     const item = document.createElement("li");
-    item.className = "rounded-md px-1.5 py-1 hover:bg-tint";
+    item.className = "px-1.5 py-1.5";
     const name = document.createElement("div");
     name.className = "truncate text-sm font-medium text-fg";
     name.textContent = source.name;
