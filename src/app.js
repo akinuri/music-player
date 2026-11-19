@@ -118,10 +118,17 @@ const contentsText = source => source.contents?.names.length ? `${source.content
 // Whether another source has the same name, so the contents are needed to tell them apart.
 const nameClashes = source => (library?.sources || []).some(other => other.id !== source.id && other.name.toLocaleLowerCase() === source.name.toLocaleLowerCase());
 
+// Chrome can leave queryPermission pending (seen after a restart, on a hosted origin),
+// which used to stall startup with the app stuck busy; past the timeout the folder counts as locked.
+const PERMISSION_TIMEOUT = 3000;
+
 async function checkPermission(source) {
   let state = "prompt";
   try {
-    state = await source.handle.queryPermission({ mode: "read" });
+    state = await Promise.race([
+      source.handle.queryPermission({ mode: "read" }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timed out checking folder access.")), PERMISSION_TIMEOUT))
+    ]);
   } catch (error) {
     console.error(`Could not check access to "${source.name}":`, error);
   }
@@ -2403,7 +2410,10 @@ async function init() {
     library = migrateLibrary(storedLibrary);
     if (library && library !== storedLibrary) await saveLibrary(library);
     savedPlaylists = storedPlaylists.map(migrateSavedPlaylist);
-    for (const source of library?.sources || []) await checkPermission(source);
+    // Show the library right away; access checks follow.
+    validateRoute();
+    render();
+    await Promise.all((library?.sources || []).map(checkPermission));
     if (library?.sources.some(source => !source.contents && permissionOf(source) === "granted")) {
       const sources = [];
       for (const source of library.sources) {
