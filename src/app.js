@@ -434,7 +434,7 @@ function renderSources() {
   elements["sources-list"].replaceChildren(...sources.map(source => {
     const granted = permissionOf(source) === "granted";
     const item = document.createElement("li");
-    item.className = "rounded-md px-1.5 py-1.5 hover:bg-tint";
+    item.className = "rounded-md px-1.5 py-1 hover:bg-tint";
     const name = document.createElement("div");
     name.className = "truncate text-sm font-medium text-fg";
     name.textContent = source.name;
@@ -879,7 +879,7 @@ function render() {
     const nav = document.createElement("button");
     nav.type = "button";
     nav.dataset.playlistId = saved.id;
-    nav.className = "flex min-w-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-base hover:bg-tint";
+    nav.className = "flex min-w-0 items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-base hover:bg-tint";
     const name = document.createElement("span");
     name.className = "min-w-0 break-words";
     name.textContent = saved.name;
