@@ -637,10 +637,11 @@ function button(icon, label, action, disabled = false, compact = false) {
   element.type = "button";
   element.setAttribute("aria-label", label);
   element.title = buttonTitles[icon];
-  element.className = `flex ${compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40`;
+  // compact: true = 32px, "small" = 28px (library rows), otherwise 40px.
+  element.className = `flex ${compact === "small" ? "h-7 w-7" : compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40`;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("class", "h-5 w-5");
+  svg.setAttribute("class", compact === "small" ? "h-4 w-4" : "h-5 w-5");
   const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
   use.setAttribute("href", `#icon-${icon}`);
   svg.append(use);
@@ -652,7 +653,7 @@ function button(icon, label, action, disabled = false, compact = false) {
 
 function trackCell(value, style) {
   const cell = document.createElement("td");
-  cell.className = `px-3 py-3 ${style}`;
+  cell.className = `px-3 py-2 ${style}`;
   const text = document.createElement("span");
   text.className = "block truncate";
   text.textContent = value;
@@ -1015,7 +1016,7 @@ function render() {
         if (!event.target.closest("button")) open();
       });
       const nameCell = document.createElement("td");
-      nameCell.className = "px-3 py-3";
+      nameCell.className = "px-3 py-2";
       const nameButton = document.createElement("button");
       nameButton.type = "button";
       nameButton.className = "block max-w-full truncate text-left font-medium text-fg-2";
@@ -1038,12 +1039,12 @@ function render() {
       const missing = paths.filter(path => !playlistPaths().includes(path));
       const addGroup = () => missing.length ? updatePlaylist([...playlistPaths(), ...missing]) : Promise.resolve(true);
       const actions = document.createElement("div");
-      actions.className = "flex justify-end gap-2";
+      actions.className = "flex justify-end gap-1.5";
       actions.append(
         button("play", `Play ${groupMode}: ${name}`, async () => {
           if (await addGroup()) await playTrack(paths[0]);
-        }, busy, true),
-        button(missing.length ? "add" : "added", `${missing.length ? "Add to playlist" : "Added to playlist"}: ${name}`, addGroup, busy || !missing.length, true)
+        }, busy, "small"),
+        button(missing.length ? "add" : "added", `${missing.length ? "Add to playlist" : "Added to playlist"}: ${name}`, addGroup, busy || !missing.length, "small")
       );
       const actionCell = document.createElement("td");
       actionCell.className = "px-3 py-1";
@@ -1056,12 +1057,12 @@ function render() {
     row.className = "border-b border-bd-3 hover:bg-field last:border-b-0";
     const added = playlistPaths().includes(track.path);
     const actions = document.createElement("div");
-    actions.className = "flex justify-end gap-2";
+    actions.className = "flex justify-end gap-1.5";
     actions.append(
-      button("play", `Play from library: ${track.title} (${track.path})`, async () => {
+      button("play", `Play from library: ${track.title} (${relativePath(track.path)})`, async () => {
         if (added || await updatePlaylist([...playlistPaths(), track.path])) await playTrack(track.path);
-      }, busy, true),
-      button(added ? "added" : "add", `${added ? "Added to playlist" : "Add to playlist"}: ${track.title} (${track.path})`, () => updatePlaylist([...playlistPaths(), track.path]), busy || added, true)
+      }, busy, "small"),
+      button(added ? "added" : "add", `${added ? "Added to playlist" : "Add to playlist"}: ${track.title} (${relativePath(track.path)})`, () => updatePlaylist([...playlistPaths(), track.path]), busy || added, "small")
     );
     const actionCell = document.createElement("td");
     actionCell.className = "px-3 py-1";

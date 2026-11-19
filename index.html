@@ -99,7 +99,7 @@
         </aside>
 
         <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
-          <div class="border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
+          <div class="border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
               <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
               <div id="library-meta" class="flex flex-wrap gap-2 text-sm"></div>
@@ -113,14 +113,14 @@
               <colgroup><col class="w-16"><col><col id="group-artist-col" class="hidden w-40"><col id="group-albums-col" class="w-24"><col id="group-year-col" class="hidden w-20"><col class="w-24"><col class="w-32"><col class="w-24"></colgroup>
               <thead class="sticky top-0 z-10 bg-head text-soft">
                 <tr class="border-b border-bd-2">
-                  <th scope="col" class="px-3 py-2.5 text-left">#</th>
-                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-group-sort="name" class="flex w-full items-center gap-2 text-left hover:text-deep"><span id="group-name-heading">Artist</span><span data-sort-indicator aria-hidden="true">↑</span></button></th>
-                  <th id="group-artist-heading" scope="col" class="hidden px-3 py-2.5 text-left"><button type="button" data-group-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th id="group-albums-heading" scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="albums" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Albums</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th id="group-year-heading" scope="col" class="hidden px-3 py-2.5 text-right"><button type="button" data-group-sort="year" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Year</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="tracks" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Tracks</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-group-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Time</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
+                  <th scope="col" class="px-3 py-2 text-left">#</th>
+                  <th scope="col" class="px-3 py-2 text-left"><button type="button" data-group-sort="name" class="flex w-full items-center gap-2 text-left hover:text-deep"><span id="group-name-heading">Artist</span><span data-sort-indicator aria-hidden="true">↑</span></button></th>
+                  <th id="group-artist-heading" scope="col" class="hidden px-3 py-2 text-left"><button type="button" data-group-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th id="group-albums-heading" scope="col" class="px-3 py-2 text-right"><button type="button" data-group-sort="albums" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Albums</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th id="group-year-heading" scope="col" class="hidden px-3 py-2 text-right"><button type="button" data-group-sort="year" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Year</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2 text-right"><button type="button" data-group-sort="tracks" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Tracks</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2 text-right"><button type="button" data-group-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Time</span><span data-sort-indicator aria-hidden="true">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="group-rows"></tbody>
@@ -129,13 +129,13 @@
               <colgroup><col class="w-14"><col class="w-20"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-20"><col class="w-24"></colgroup>
               <thead class="sticky top-0 z-10 bg-head text-soft">
                 <tr class="border-b border-bd-2">
-                  <th scope="col" class="px-3 py-2.5 text-left">#</th>
-                  <th scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-deep"><span aria-hidden="true">Track</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th scope="col" aria-sort="ascending" class="px-3 py-2.5 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-deep">↑</span></button></th>
-                  <th id="track-artist-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th id="track-album-heading" scope="col" class="px-3 py-2.5 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right"><button type="button" data-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Time</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
-                  <th scope="col" class="px-3 py-2.5 text-right">Actions</th>
+                  <th scope="col" class="px-3 py-2 text-left">#</th>
+                  <th scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-deep"><span aria-hidden="true">Track</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" aria-sort="ascending" class="px-3 py-2 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-deep">↑</span></button></th>
+                  <th id="track-artist-heading" scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th id="track-album-heading" scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2 text-right"><button type="button" data-sort="duration" class="flex w-full items-center justify-end gap-2 text-right hover:text-deep"><span>Time</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="track-rows"></tbody>
@@ -148,7 +148,7 @@
         </section>
 
         <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
             <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
             <div id="saved-actions" class="ml-auto flex shrink-0 gap-1"></div>
@@ -169,7 +169,7 @@
         </section>
 
         <section id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="analysis-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="analysis-title" class="flex flex-wrap items-center gap-x-1.5">Analysis</span></h2>
             <div id="analysis-meta" class="flex flex-wrap gap-2 text-sm"></div>
             <div role="group" aria-label="Timeline measure" class="ml-auto flex overflow-hidden rounded-md border border-bd-in text-sm">
@@ -185,7 +185,7 @@
         </section>
 
         <section id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="visualizer-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Visualizer</h2>
           </div>
           <div class="relative min-h-[260px] flex-1">
@@ -195,7 +195,7 @@
         </section>
 
         <section id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
-          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-4 sm:px-6">
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
             <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
           </div>
