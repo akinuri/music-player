@@ -1170,7 +1170,7 @@ function render() {
   if (!selected) {
     const exportAll = button("export", "Export all playlists", () => exportPlaylists(savedPlaylists, "playlists"), busy || !savedPlaylists.length);
     exportAll.title = "Export all playlists";
-    const importButton = button("import", "Import playlists", () => elements["import-file"].click(), busy || !library);
+    const importButton = button("import", "Import playlists", () => elements["import-file"].click(), busy);
     importButton.dataset.drop = "playlists";
     importButton.classList.add("origin-center", "transition-transform", "duration-150");
     elements["saved-actions"].append(importButton, exportAll);
@@ -1760,41 +1760,43 @@ function forgetDropped(paths) {
   }
 }
 
-// Reads what was dropped (files and folders, recursively), appends it to the current playlist and starts playing it
-// unless something is already playing. Tags and durations are filled in afterwards, so playback starts right away.
-async function dropToPlaylist(dataTransfer) {
-  // Everything on a DataTransfer must be taken before the first await.
+// Dropping music (on the current playlist or the playlists' import button) works in steps shared by both targets.
+
+// Everything on a DataTransfer must be taken synchronously, before the first await.
+function takeDrop(dataTransfer) {
   const items = [...dataTransfer.items].filter(item => item.kind === "file");
   const files = [...dataTransfer.files];
   const handles = "getAsFileSystemHandle" in DataTransferItem.prototype ? items.map(item => item.getAsFileSystemHandle().catch(() => null)) : [];
+  return { count: Math.max(items.length, files.length), files, handles };
+}
+
+// Music in what was dropped (folders read recursively, in natural order), .txt files that may hold lyrics, and any other files.
+async function readDrop({ count, files, handles }) {
   const found = [];
   const texts = [];
-  try {
-    for (let i = 0; i < Math.max(items.length, files.length); i++) {
-      const handle = await handles[i];
-      if (handle?.kind === "directory") {
-        const inFolder = [];
-        for await (const { path, handle: fileHandle } of findAudioFiles(handle)) inFolder.push({ handle: fileHandle, directory: handle, relative: path });
-        inFolder.sort((a, b) => a.relative.localeCompare(b.relative, undefined, { numeric: true, sensitivity: "base" }));
-        found.push(...inFolder.map(item => ({ ...item, label: `${handle.name}/${item.relative}` })));
-        continue;
-      }
-      const file = handle ? await handle.getFile() : files[i];
-      if (!file) continue;
-      if (isAudioFile(file.name)) found.push({ file, handle, relative: file.name, label: file.name });
-      else if (/\.txt$/i.test(file.name)) texts.push(file);
+  const others = [];
+  for (let i = 0; i < count; i++) {
+    const handle = await handles[i];
+    if (handle?.kind === "directory") {
+      const inFolder = [];
+      for await (const { path, handle: fileHandle } of findAudioFiles(handle)) inFolder.push({ handle: fileHandle, directory: handle, relative: path });
+      inFolder.sort((a, b) => a.relative.localeCompare(b.relative, undefined, { numeric: true, sensitivity: "base" }));
+      found.push(...inFolder.map(item => ({ ...item, label: `${handle.name}/${item.relative}` })));
+      continue;
     }
-  } catch (error) {
-    console.error("Could not read dropped items:", error);
-    notice("Couldn't read what was dropped. Check browser permissions and try again.", true);
-    return;
+    const file = handle ? await handle.getFile() : files[i];
+    if (!file) continue;
+    if (isAudioFile(file.name)) found.push({ file, handle, relative: file.name, label: file.name });
+    else if (/\.txt$/i.test(file.name)) texts.push(file);
+    else others.push(file);
   }
-  if (!found.length) {
-    notice("No music files in what was dropped.", true);
-    return;
-  }
+  return { found, texts, others };
+}
+
+// Makes dropped music playable in this session; returns its keys.
+function registerDrop(found, texts) {
   const baseName = name => name.replace(/\.[^.]*$/, "").toLocaleLowerCase();
-  const keys = found.map(item => {
+  return found.map(item => {
     // Unique across reloads, since direct-play playlists keep these keys.
     const key = `drop:${crypto.randomUUID().slice(0, 8)}/${item.label}`;
     const name = item.relative.split("/").pop();
@@ -1802,44 +1804,33 @@ async function dropToPlaylist(dataTransfer) {
     dropped.set(key, { ...item, lyricsFile, track: { path: key, title: name.replace(/\.[^.]*$/, ""), artist: "", album: "", trackNumber: null, year: null, duration: null } });
     return key;
   });
-  const count = `${keys.length.toLocaleString()} ${keys.length === 1 ? "track" : "tracks"}`;
-  let message;
-  if (!playlistPaths().length) {
-    // An empty current playlist becomes a new direct-play playlist, named after a single dropped folder.
-    const folders = [...new Set(found.map(item => item.directory?.name ?? null))];
-    const folderName = folders.length === 1 && folders[0] ? folders[0] : null;
-    const names = savedPlaylists.map(saved => saved.name);
-    let name = folderName ? uniquePlaylistName(folderName, names) : null;
-    for (let number = 1; !name; number++) {
-      const candidate = `Direct play ${String(number).padStart(3, "0")}`;
-      if (!names.some(existing => existing.toLocaleLowerCase() === candidate.toLocaleLowerCase())) name = candidate;
-    }
-    const saved = { id: crypto.randomUUID(), name, instant: true, sources: [], tracks: keys.map(trackSnapshot), savedAt: Date.now() };
-    try {
-      await saveSavedPlaylist(saved);
-    } catch (error) {
-      console.error("Could not save the direct-play playlist:", error);
-      for (const key of keys) dropped.delete(key);
-      notice("Couldn't save the new playlist. Check your browser's storage settings and try again.", true);
-      return;
-    }
-    savedPlaylists = [...savedPlaylists, saved];
-    if (!await updatePlaylist(keys, { loadedPlaylistId: saved.id })) {
-      if (busy) notice(`Saved "${name}". Wait for the current task to finish, then load it.`, true);
-      return;
-    }
-    message = `Created playlist "${name}" with ${count}. Dropped music plays from its files and isn't added to the library.`;
-  } else {
-    const direct = savedPlaylists.find(saved => saved.id === loadedPlaylistId() && isDirectPlaylist(saved));
-    if (!await updatePlaylist([...playlistPaths(), ...keys])) {
-      for (const key of keys) dropped.delete(key);
-      if (busy) notice("Wait for the current task to finish, then drop again.", true);
-      return;
-    }
-    message = direct ? `Added ${count} to "${direct.name}".` : `Added ${count}. Dropped music plays from its files and isn't added to the library.`;
+}
+
+// Saves a direct-play playlist of dropped music, named after a single dropped folder or "Direct play 001"…
+async function createDirectPlaylist(found, keys) {
+  const folders = [...new Set(found.map(item => item.directory?.name ?? null))];
+  const folderName = folders.length === 1 && folders[0] ? folders[0] : null;
+  const names = savedPlaylists.map(saved => saved.name);
+  let name = folderName ? uniquePlaylistName(folderName, names) : null;
+  for (let number = 1; !name; number++) {
+    const candidate = `Direct play ${String(number).padStart(3, "0")}`;
+    if (!names.some(existing => existing.toLocaleLowerCase() === candidate.toLocaleLowerCase())) name = candidate;
   }
-  notice(message);
-  if (!player.path || player.audio.paused) playTrack(keys[0]);
+  const saved = { id: crypto.randomUUID(), name, instant: true, sources: [], tracks: keys.map(trackSnapshot), savedAt: Date.now() };
+  try {
+    await saveSavedPlaylist(saved);
+  } catch (error) {
+    console.error("Could not save the direct-play playlist:", error);
+    for (const key of keys) dropped.delete(key);
+    notice("Couldn't save the new playlist. Check your browser's storage settings and try again.", true);
+    return null;
+  }
+  savedPlaylists = [...savedPlaylists, saved];
+  return saved;
+}
+
+// Reads tags and durations of dropped music in the background, then stores them in the direct-play playlists holding it.
+async function fillDropDetails(keys) {
   let lastRender = Date.now();
   for (const key of keys) {
     const entry = dropped.get(key);
@@ -1873,6 +1864,47 @@ async function dropToPlaylist(dataTransfer) {
     }
   }
   render();
+}
+
+// Dropped on the current playlist: an empty one becomes a new direct-play playlist; otherwise the music is appended
+// (and added to the direct-play playlist if that's the one loaded). Playback starts right away unless something plays.
+async function dropToPlaylist(dataTransfer) {
+  const drop = takeDrop(dataTransfer);
+  let found, texts;
+  try {
+    ({ found, texts } = await readDrop(drop));
+  } catch (error) {
+    console.error("Could not read dropped items:", error);
+    notice("Couldn't read what was dropped. Check browser permissions and try again.", true);
+    return;
+  }
+  if (!found.length) {
+    notice("No music files in what was dropped.", true);
+    return;
+  }
+  const keys = registerDrop(found, texts);
+  const count = `${keys.length.toLocaleString()} ${keys.length === 1 ? "track" : "tracks"}`;
+  let message;
+  if (!playlistPaths().length) {
+    const saved = await createDirectPlaylist(found, keys);
+    if (!saved) return;
+    if (!await updatePlaylist(keys, { loadedPlaylistId: saved.id })) {
+      if (busy) notice(`Saved "${saved.name}". Wait for the current task to finish, then load it.`, true);
+      return;
+    }
+    message = `Created playlist "${saved.name}" with ${count}. Dropped music plays from its files and isn't added to the library.`;
+  } else {
+    const direct = savedPlaylists.find(saved => saved.id === loadedPlaylistId() && isDirectPlaylist(saved));
+    if (!await updatePlaylist([...playlistPaths(), ...keys])) {
+      for (const key of keys) dropped.delete(key);
+      if (busy) notice("Wait for the current task to finish, then drop again.", true);
+      return;
+    }
+    message = direct ? `Added ${count} to "${direct.name}".` : `Added ${count}. Dropped music plays from its files and isn't added to the library.`;
+  }
+  notice(message);
+  if (!player.path || player.audio.paused) playTrack(keys[0]);
+  await fillDropDetails(keys);
 }
 
 const SESSION_KEY = "playback-session";
@@ -2142,10 +2174,31 @@ async function dropFolder(dataTransfer) {
   }
 }
 
-function dropPlaylistFiles(dataTransfer) {
-  const files = [...dataTransfer.files].filter(file => file.type === "application/json" || /.json$/i.test(file.name));
-  if (!files.length) notice("Drop playlist .json files.", true);
-  else importPlaylists(files);
+// Dropped on the playlists' import button: exported playlist files are imported; music files and folders become a new
+// direct-play playlist (saved and shown, not loaded into the current playlist). Neither touches the library.
+async function dropOnPlaylists(dataTransfer) {
+  const drop = takeDrop(dataTransfer);
+  let found, texts, others;
+  try {
+    ({ found, texts, others } = await readDrop(drop));
+  } catch (error) {
+    console.error("Could not read dropped items:", error);
+    notice("Couldn't read what was dropped. Check browser permissions and try again.", true);
+    return;
+  }
+  const exported = others.filter(file => file.type === "application/json" || /\.json$/i.test(file.name));
+  if (!exported.length && !found.length) {
+    notice("Drop exported playlists (.json), or music files or folders.", true);
+    return;
+  }
+  if (exported.length) await importPlaylists(exported);
+  if (!found.length) return;
+  const keys = registerDrop(found, texts);
+  const saved = await createDirectPlaylist(found, keys);
+  if (!saved) return;
+  selectPlaylist(saved);
+  notice(`Created playlist "${saved.name}" with ${keys.length.toLocaleString()} ${keys.length === 1 ? "track" : "tracks"}. Load it to play; dropped music plays from its files and isn't added to the library.`);
+  await fillDropDetails(keys);
 }
 
 // Buttons that accept dropped files. The import button is re-created on render, so targets are looked up on demand.
@@ -2158,7 +2211,7 @@ const dropTargets = [
     active: ["outline", "outline-[3px]", "outline-dashed", "-outline-offset-4", "outline-primary"], hover: ["!outline", "!bg-accent-soft", "!text-deep"]
   },
   // The playlists card clips its contents (rounded corners), which would cut off the enlarged button, so unclip it while dragging.
-  { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy && !!library, drop: dropPlaylistFiles, text: "Drop playlists (.json)", unclip: node => node.closest("section") }
+  { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy, drop: dropOnPlaylists, text: "Drop playlists (.json) or music", unclip: node => node.closest("section") }
 ];
 
 function activeDropTargets() {
