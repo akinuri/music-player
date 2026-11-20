@@ -1,4 +1,4 @@
-import { findSiblingFile, getTrackFile, listContents, scanLibrary } from "./filesystem.js";
+import { findAudioFiles, findSiblingFile, getTrackFile, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata } from "./metadata.js";
 import { activeLyricIndex, decodeText, parseLyrics } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
@@ -12,7 +12,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -138,18 +138,32 @@ async function checkPermission(source) {
   return state;
 }
 
+async function droppedFile(entry) {
+  entry.file ||= await entry.handle.getFile();
+  return entry.file;
+}
+
 async function trackFile(path) {
+  if (dropped.has(path)) return droppedFile(dropped.get(path));
   const source = sourceOf(path);
   if (!source) throw new Error("The track's folder is not in the library.");
   return getTrackFile(source.handle, relativePath(path));
 }
 
+// Music dropped on the current playlist plays straight from the dropped files and is never added to the library or
+// saved: it lives in memory under "drop:<n>/<path>" keys and is forgotten on reload or once it leaves the playlist.
+const dropped = new Map();
+let droppedCount = 0;
+const isDropped = path => !!path && path.startsWith("drop:");
+// The current playlist when there is no library yet (only dropped music); not saved.
+let unsavedPlaylist = [];
+
 function playlistPaths() {
-  return library?.playlist || [];
+  return library ? library.playlist : unsavedPlaylist;
 }
 
 function trackFor(path) {
-  return library?.tracks.find(track => track.path === path);
+  return library?.tracks.find(track => track.path === path) || dropped.get(path)?.track;
 }
 
 function albumText(track) {
@@ -502,7 +516,9 @@ async function loadLyrics(path) {
   }
   if (!text.trim()) {
     try {
-      const sidecar = await findSiblingFile(sourceOf(path).handle, relativePath(path), ".txt");
+      const drop = dropped.get(path);
+      const sidecar = drop ? drop.lyricsFile || (drop.directory && await findSiblingFile(drop.directory, drop.relative, ".txt"))
+        : await findSiblingFile(sourceOf(path).handle, relativePath(path), ".txt");
       if (sidecar) {
         text = decodeText(await sidecar.arrayBuffer());
         source = sidecar.name;
@@ -514,7 +530,7 @@ async function loadLyrics(path) {
   }
   const parsed = parseLyrics(text);
   entry = parsed.lines.length ? { status: "ready", source, ...parsed } : { status: failed ? "error" : "none" };
-  if (!library || lyricsCache.get(path)?.status !== "loading") return;
+  if (lyricsCache.get(path)?.status !== "loading") return;
   lyricsCache.set(path, entry);
   if (currentView === "lyrics" && player.path === path) renderLyrics();
 }
@@ -530,7 +546,7 @@ function renderLyrics() {
     elements["lyrics-meta"].dataset.key = metaKey;
     renderMeta(elements["lyrics-meta"], meta);
   }
-  if (path && library && !lyricsCache.has(path)) loadLyrics(path);
+  if (path && (library || dropped.has(path)) && !lyricsCache.has(path)) loadLyrics(path);
   const entry = path ? lyricsCache.get(path) : null;
   if (entry !== lyricsShown) {
     lyricsShown = entry;
@@ -1169,7 +1185,7 @@ function render() {
   });
   elements["playlist-empty"].classList.toggle("hidden", paths.length > 0);
   elements["clear-playlist"].disabled = busy || !paths.length;
-  elements["save-playlist"].disabled = busy || !paths.length;
+  elements["save-playlist"].disabled = busy || !library || !paths.some(path => !isDropped(path));
   elements["save-submit"].disabled = busy || !paths.length;
   elements["playlist-name"].disabled = busy;
   elements["save-cancel"].disabled = busy;
@@ -1532,7 +1548,9 @@ async function saveNamedPlaylist() {
   busy = true;
   render();
   try {
-    const saved = createSavedPlaylist(name, library, existing);
+    // Dropped music isn't in the library, so a saved playlist can't find it again.
+    const skipped = playlistPaths().filter(isDropped).length;
+    const saved = createSavedPlaylist(name, { ...library, playlist: playlistPaths().filter(path => !isDropped(path)) }, existing);
     await saveSavedPlaylist(saved);
     savedPlaylists = [...savedPlaylists.filter(item => item.id !== saved.id), saved];
     library = { ...library, loadedPlaylistId: saved.id };
@@ -1540,7 +1558,7 @@ async function saveNamedPlaylist() {
     await refreshSelectedPlaylistMatch();
     elements["save-form"].classList.add("hidden");
     elements["playlist-name"].value = "";
-    notice(`Saved playlist "${saved.name}".`);
+    notice(`Saved playlist "${saved.name}".${skipped ? ` ${skipped.toLocaleString()} dropped ${skipped === 1 ? "track was" : "tracks were"} left out, as ${skipped === 1 ? "it isn't" : "they aren't"} in the library.` : ""}`);
   } catch (error) {
     console.error("Could not save named playlist:", error);
     notice("Couldn't save the playlist. Your saved playlists were not changed.", true);
@@ -1636,7 +1654,14 @@ async function removeSavedPlaylist(saved) {
 }
 
 async function updatePlaylist(paths, extra = {}) {
-  if (!library || busy) return false;
+  if (busy) return false;
+  if (!library) {
+    unsavedPlaylist = paths;
+    if ((player.path && !paths.includes(player.path)) || (player.pendingPath && !paths.includes(player.pendingPath))) player.stop();
+    forgetDropped(paths);
+    render();
+    return true;
+  }
   busy = true;
   render();
   try {
@@ -1647,6 +1672,7 @@ async function updatePlaylist(paths, extra = {}) {
       player.stop();
       clearSession();
     }
+    forgetDropped(paths);
     return true;
   } catch (error) {
     console.error("Could not save playlist:", error);
@@ -1656,6 +1682,89 @@ async function updatePlaylist(paths, extra = {}) {
     busy = false;
     render();
   }
+}
+
+function forgetDropped(paths) {
+  const kept = new Set(paths);
+  for (const key of dropped.keys()) {
+    if (!kept.has(key) && key !== player.path) {
+      dropped.delete(key);
+      lyricsCache.delete(key);
+    }
+  }
+}
+
+// Reads what was dropped (files and folders, recursively), appends it to the current playlist and starts playing it
+// unless something is already playing. Tags and durations are filled in afterwards, so playback starts right away.
+async function dropToPlaylist(dataTransfer) {
+  // Everything on a DataTransfer must be taken before the first await.
+  const items = [...dataTransfer.items].filter(item => item.kind === "file");
+  const files = [...dataTransfer.files];
+  const handles = "getAsFileSystemHandle" in DataTransferItem.prototype ? items.map(item => item.getAsFileSystemHandle().catch(() => null)) : [];
+  const found = [];
+  const texts = [];
+  try {
+    for (let i = 0; i < Math.max(items.length, files.length); i++) {
+      const handle = await handles[i];
+      if (handle?.kind === "directory") {
+        const inFolder = [];
+        for await (const { path, handle: fileHandle } of findAudioFiles(handle)) inFolder.push({ handle: fileHandle, directory: handle, relative: path });
+        inFolder.sort((a, b) => a.relative.localeCompare(b.relative, undefined, { numeric: true, sensitivity: "base" }));
+        found.push(...inFolder.map(item => ({ ...item, label: `${handle.name}/${item.relative}` })));
+        continue;
+      }
+      const file = handle ? await handle.getFile() : files[i];
+      if (!file) continue;
+      if (isAudioFile(file.name)) found.push({ file, relative: file.name, label: file.name });
+      else if (/\.txt$/i.test(file.name)) texts.push(file);
+    }
+  } catch (error) {
+    console.error("Could not read dropped items:", error);
+    notice("Couldn't read what was dropped. Check browser permissions and try again.", true);
+    return;
+  }
+  if (!found.length) {
+    notice("No music files in what was dropped.", true);
+    return;
+  }
+  const baseName = name => name.replace(/\.[^.]*$/, "").toLocaleLowerCase();
+  const keys = found.map(item => {
+    const key = `drop:${++droppedCount}/${item.label}`;
+    const name = item.relative.split("/").pop();
+    const lyricsFile = item.file && texts.find(text => baseName(text.name) === baseName(name));
+    dropped.set(key, { ...item, lyricsFile, track: { path: key, title: name.replace(/\.[^.]*$/, ""), artist: "", album: "", trackNumber: null, year: null, duration: null } });
+    return key;
+  });
+  if (!await updatePlaylist([...playlistPaths(), ...keys])) {
+    for (const key of keys) dropped.delete(key);
+    if (busy) notice("Wait for the current task to finish, then drop again.", true);
+    return;
+  }
+  notice(`Added ${keys.length.toLocaleString()} dropped ${keys.length === 1 ? "track" : "tracks"}. ${keys.length === 1 ? "It plays" : "They play"} from the dropped files and ${keys.length === 1 ? "isn't" : "aren't"} added to the library.`);
+  if (!player.path || player.audio.paused) playTrack(keys[0]);
+  let lastRender = Date.now();
+  for (const key of keys) {
+    const entry = dropped.get(key);
+    if (!entry) continue;
+    try {
+      const metadata = await readMetadata(await droppedFile(entry));
+      Object.assign(entry.track, {
+        title: metadata.title || entry.track.title,
+        artist: metadata.artist,
+        album: metadata.album,
+        trackNumber: metadata.trackNumber,
+        year: metadata.year,
+        duration: metadata.duration
+      });
+    } catch (error) {
+      console.error("Could not read dropped file:", error);
+    }
+    if (Date.now() - lastRender > 400) {
+      lastRender = Date.now();
+      render();
+    }
+  }
+  render();
 }
 
 const SESSION_KEY = "playback-session";
@@ -1717,6 +1826,17 @@ async function restoreSession() {
 }
 
 async function playTrack(path) {
+  const drop = dropped.get(path);
+  if (drop) {
+    try {
+      await player.play(null, path, { file: await droppedFile(drop) });
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.error("Playback failed:", error);
+      notice("Couldn't play this dropped file. It may have been moved, removed, or be unsupported.", true);
+    }
+    return;
+  }
   const source = sourceOf(path);
   if (!library || !trackFor(path) || !source) {
     notice("This playlist track is not in the library. Rescan or remove it.", true);
@@ -1923,6 +2043,12 @@ function dropPlaylistFiles(dataTransfer) {
 // Buttons that accept dropped files. The import button is re-created on render, so targets are looked up on demand.
 const dropTargets = [
   { element: () => elements["choose-folder"], enabled: canDropFolder, drop: dropFolder, text: "Drop folders" },
+  // Same look as the buttons, except a whole panel can't grow: the dashed edge is an inset outline (so the list doesn't
+  // shift) and the caption sits in its middle.
+  {
+    element: () => elements["playlist-drop"], enabled: () => !busy, drop: dropToPlaylist, text: "Drop to play", inside: true,
+    active: ["outline", "outline-[3px]", "outline-dashed", "-outline-offset-4", "outline-primary"], hover: ["!outline", "!bg-accent-soft", "!text-deep"]
+  },
   // The playlists card clips its contents (rounded corners), which would cut off the enlarged button, so unclip it while dragging.
   { element: () => document.querySelector("[data-drop=playlists]"), enabled: () => !busy && !!library, drop: dropPlaylistFiles, text: "Drop playlists (.json)", unclip: node => node.closest("section") }
 ];
@@ -1952,7 +2078,8 @@ function placeDropLabel(target, node, hovered) {
   const bounds = node.getBoundingClientRect();
   const left = bounds.left + bounds.width / 2 - label.offsetWidth / 2;
   label.style.left = `${Math.max(4, Math.min(left, window.innerWidth - label.offsetWidth - 4))}px`;
-  label.style.top = `${Math.min(bounds.bottom + 6, window.innerHeight - label.offsetHeight - 4)}px`;
+  const top = target.inside ? bounds.top + Math.min(bounds.height, window.innerHeight - bounds.top) / 2 - label.offsetHeight / 2 : bounds.bottom + 6;
+  label.style.top = `${Math.max(4, Math.min(top, window.innerHeight - label.offsetHeight - 4))}px`;
 }
 
 function setDropState(active, hovered = null) {
@@ -1962,8 +2089,8 @@ function setDropState(active, hovered = null) {
     const on = active && !!node.offsetParent && target.enabled();
     node.classList.toggle("relative", on);
     node.classList.toggle("z-10", on);
-    for (const name of dropActive) node.classList.toggle(name, on);
-    for (const name of dropHover) node.classList.toggle(name, on && node === hovered);
+    for (const name of target.active || dropActive) node.classList.toggle(name, on);
+    for (const name of target.hover || dropHover) node.classList.toggle(name, on && node === hovered);
     target.unclip?.(node)?.classList.toggle("!overflow-visible", on);
     placeDropLabel(target, on && node, node === hovered);
   }
@@ -2421,6 +2548,8 @@ async function init() {
   try {
     const [storedLibrary, storedPlaylists] = await Promise.all([loadLibrary(), loadSavedPlaylists()]);
     library = migrateLibrary(storedLibrary);
+    // Dropped music was only in memory; its playlist entries can't be played after a reload.
+    if (library?.playlist.some(isDropped)) library = { ...library, playlist: library.playlist.filter(path => !isDropped(path)) };
     if (library && library !== storedLibrary) await saveLibrary(library);
     savedPlaylists = storedPlaylists.map(migrateSavedPlaylist);
     // Show the library right away; access checks follow.

@@ -9,6 +9,17 @@ export async function* findMp3Files(directory, prefix = "") {
   }
 }
 
+// Formats browsers commonly play. The library indexes MP3s only; dropped music may be any of these.
+export const isAudioFile = name => /\.(mp3|m4a|aac|ogg|oga|opus|flac|wav|weba|webm)$/i.test(name);
+
+export async function* findAudioFiles(directory, prefix = "") {
+  for await (const [name, handle] of directory.entries()) {
+    const path = prefix ? `${prefix}/${name}` : name;
+    if (handle.kind === "directory") yield* findAudioFiles(handle, path);
+    else if (handle.kind === "file" && isAudioFile(name)) yield { path, handle };
+  }
+}
+
 export async function getTrackFile(directory, path) {
   const parts = path.split("/");
   const name = parts.pop();

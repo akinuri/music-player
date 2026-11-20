@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findSiblingFile, getTrackFile, listContents, scanLibrary } from "../src/filesystem.js";
+import { findAudioFiles, findSiblingFile, getTrackFile, isAudioFile, listContents, scanLibrary } from "../src/filesystem.js";
 
 function file(name, overrides = {}) {
   return { kind: "file", getFile: async () => ({ name, size: 12, lastModified: 1, ...overrides }) };
@@ -80,4 +80,13 @@ test("lists a folder's first entries, sub-folders first in natural order, skippi
   const root = directory([["b.mp3", file("b.mp3")], ["Rock", directory([])], [".hidden", directory([])], ["Album 10", directory([])], ["Album 2", directory([])], ["a.jpg", file("a.jpg")]]);
   assert.deepEqual(await listContents(root), { names: ["Album 2", "Album 10", "Rock"], more: true });
   assert.deepEqual(await listContents(root, 10), { names: ["Album 2", "Album 10", "Rock", "a.jpg", "b.mp3"], more: false });
+});
+
+test("finds playable audio of common formats recursively, for dropped folders", async () => {
+  const root = directory([["a.MP3", file("a.MP3")], ["cover.jpg", file("cover.jpg")], ["disc 2", directory([["b.flac", file("b.flac")], ["c.m4a", file("c.m4a")], ["notes.txt", file("notes.txt")]])]]);
+  const paths = [];
+  for await (const { path } of findAudioFiles(root)) paths.push(path);
+  assert.deepEqual(paths, ["a.MP3", "disc 2/b.flac", "disc 2/c.m4a"]);
+  assert.equal(isAudioFile("x.opus"), true);
+  assert.equal(isAudioFile("x.mp3.txt"), false);
 });

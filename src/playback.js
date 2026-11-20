@@ -30,12 +30,13 @@ export class Playback {
   }
 
   // `path` identifies the track (what `this.path` reports); `filePath` locates it inside `directory` when they differ.
-  async play(directory, path, { startAt = 0, autoplay = true, filePath = path } = {}) {
+  // `file` plays a File directly (e.g. dropped music that isn't in any folder source).
+  async play(directory, path, { startAt = 0, autoplay = true, filePath = path, file: given = null } = {}) {
     this.stop();
     const request = this.request;
     this.pendingPath = path;
     try {
-      const file = await getTrackFile(directory, filePath);
+      const file = given || await getTrackFile(directory, filePath);
       if (request !== this.request) return;
       this.pendingPath = null;
       this.url = URL.createObjectURL(file);
