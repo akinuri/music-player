@@ -88,6 +88,14 @@ test("migrates single-folder saved playlists", () => {
   assert.equal(migrateSavedPlaylist(migrated), migrated);
 });
 
+test("direct-play tracks resolve to themselves and their file handles stay out of exports", async () => {
+  const saved = { name: "Direct play 001", instant: true, sources: [], tracks: [track("drop:ab12/Song.mp3", { title: "Song", handle: { kind: "file" }, relative: "Song.mp3" })] };
+  assert.deepEqual(await resolvePlaylist(saved, { sources: [] }), { paths: ["drop:ab12/Song.mp3"], missing: [] });
+  const exported = JSON.parse(serializePlaylists([saved])).playlists[0].tracks[0];
+  assert.equal("handle" in exported || "relative" in exported, false);
+  assert.equal(exported.title, "Song");
+});
+
 test("resolves saved tracks to current sources by id, then same folder on disk, then unique name", async () => {
   const disk = {};
   const current = [{ id: "s1", handle: {}, name: "Music" }, { id: "s2", handle: disk, name: "Renamed" }, { id: "s3", handle: {}, name: "Extra" }];

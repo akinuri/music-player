@@ -7,7 +7,7 @@ import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
 import { initTooltips } from "./tooltips.js";
 import { currentPreference, initTheme, setPreference } from "./theme.js";
-import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, migrateSavedPlaylist, parsePlaylists, PlaylistFileError, resolvePlaylist, serializePlaylists } from "./playlists.js";
+import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, migrateSavedPlaylist, uniquePlaylistName, parsePlaylists, PlaylistFileError, resolvePlaylist, serializePlaylists } from "./playlists.js";
 import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks } from "./sources.js";
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
@@ -138,8 +138,13 @@ async function checkPermission(source) {
   return state;
 }
 
-async function droppedFile(entry) {
-  entry.file ||= await entry.handle.getFile();
+async function droppedFile(entry, { ask = false } = {}) {
+  if (!entry.file) {
+    // Access was granted by the drop; after a reload it's per dropped folder (or file) and may need asking again.
+    const scope = entry.directory || entry.handle;
+    if (ask && scope.queryPermission && await scope.queryPermission({ mode: "read" }) !== "granted") await scope.requestPermission({ mode: "read" });
+    entry.file = await entry.handle.getFile();
+  }
   return entry.file;
 }
 
@@ -153,10 +158,50 @@ async function trackFile(path) {
 // Music dropped on the current playlist plays straight from the dropped files and is never added to the library or
 // saved: it lives in memory under "drop:<n>/<path>" keys and is forgotten on reload or once it leaves the playlist.
 const dropped = new Map();
-let droppedCount = 0;
 const isDropped = path => !!path && path.startsWith("drop:");
-// The current playlist when there is no library yet (only dropped music); not saved.
+// The current playlist when there is no library yet (only dropped music); kept in memory, with the saved playlist it
+// was loaded from.
 let unsavedPlaylist = [];
+let unsavedLoadedId = null;
+const loadedPlaylistId = () => (library ? library.loadedPlaylistId : unsavedLoadedId) ?? null;
+
+// Direct-play playlists are created when music is dropped on an empty current playlist. They are saved like any
+// playlist, holding the dropped files' handles so they can be played again after a reload (with the browser's consent).
+const isDirectPlaylist = saved => saved?.instant === true;
+
+// Makes a direct-play playlist's tracks playable in this session.
+function registerDirectTracks(saved) {
+  for (const track of saved.tracks) {
+    if (!isDropped(track.path) || dropped.has(track.path) || !track.handle) continue;
+    const { handle, directory, relative, ...info } = track;
+    dropped.set(track.path, { handle, directory, relative, track: { ...info } });
+  }
+}
+
+// A saved-playlist entry for a track in the current playlist (dropped music keeps its file handles).
+function trackSnapshot(path) {
+  const track = trackFor(path);
+  const info = { path, title: track?.title || "", artist: track?.artist || "", album: track?.album || "", year: track?.year ?? null, trackNumber: track?.trackNumber ?? null, duration: track?.duration ?? null };
+  const drop = dropped.get(path);
+  return drop ? { ...info, handle: drop.handle ?? null, directory: drop.directory ?? null, relative: drop.relative } : info;
+}
+
+// Appends tracks to a saved playlist, recording the library folders they come from so it can find them again.
+async function appendToSavedPlaylist(saved, paths) {
+  const known = new Set(saved.sources.map(source => source.id));
+  const sources = [...saved.sources];
+  for (const path of paths) {
+    const source = sourceOf(path);
+    if (source && !known.has(source.id)) {
+      known.add(source.id);
+      sources.push({ id: source.id, handle: source.handle, name: source.name });
+    }
+  }
+  const updated = { ...saved, sources, tracks: [...saved.tracks, ...paths.map(trackSnapshot)] };
+  await saveSavedPlaylist(updated);
+  savedPlaylists = savedPlaylists.map(item => item.id === saved.id ? updated : item);
+  return updated;
+}
 
 function playlistPaths() {
   return library ? library.playlist : unsavedPlaylist;
@@ -1585,7 +1630,7 @@ async function loadPlaylist(saved) {
     render();
   }
   if (!resolved) return null;
-  const anyFound = resolved.paths.some(path => sourceOf(path));
+  const anyFound = resolved.paths.some(path => sourceOf(path) || dropped.has(path));
   if (!anyFound && saved.tracks.length) {
     notice(`Add ${resolved.missing.length === 1 ? "the folder" : "the folders"} ${quoteNames(resolved.missing)} before loading this playlist.`, true);
     return null;
@@ -1619,7 +1664,7 @@ async function updateSavedTracks(saved, tracks, action) {
 async function playSavedTrack(saved, index) {
   if (busy) return;
   let paths = null;
-  if (library?.loadedPlaylistId === saved.id) {
+  if (loadedPlaylistId() === saved.id) {
     try {
       ({ paths } = await resolvePlaylist(saved, library));
     } catch (error) {
@@ -1638,6 +1683,7 @@ async function removeSavedPlaylist(saved) {
   try {
     await deleteSavedPlaylist(saved.id);
     savedPlaylists = savedPlaylists.filter(item => item.id !== saved.id);
+    if (unsavedLoadedId === saved.id) unsavedLoadedId = null;
     if (library?.loadedPlaylistId === saved.id) {
       library = { ...library, loadedPlaylistId: null };
       await saveLibrary(library);
@@ -1655,10 +1701,13 @@ async function removeSavedPlaylist(saved) {
 
 async function updatePlaylist(paths, extra = {}) {
   if (busy) return false;
+  const added = paths.filter(path => !playlistPaths().includes(path));
   if (!library) {
     unsavedPlaylist = paths;
+    unsavedLoadedId = paths.length ? extra.loadedPlaylistId ?? unsavedLoadedId : null;
     if ((player.path && !paths.includes(player.path)) || (player.pendingPath && !paths.includes(player.pendingPath))) player.stop();
     forgetDropped(paths);
+    await growDirectPlaylist(added, extra);
     render();
     return true;
   }
@@ -1673,6 +1722,7 @@ async function updatePlaylist(paths, extra = {}) {
       clearSession();
     }
     forgetDropped(paths);
+    await growDirectPlaylist(added, extra);
     return true;
   } catch (error) {
     console.error("Could not save playlist:", error);
@@ -1684,8 +1734,24 @@ async function updatePlaylist(paths, extra = {}) {
   }
 }
 
+// While a direct-play playlist is the current one, whatever is added to the current playlist is added to it too.
+async function growDirectPlaylist(added, extra) {
+  const saved = savedPlaylists.find(item => item.id === loadedPlaylistId());
+  if (!added.length || "loadedPlaylistId" in extra || !isDirectPlaylist(saved)) return;
+  const known = new Set(saved.tracks.map(track => track.path));
+  const fresh = added.filter(path => !known.has(path));
+  if (!fresh.length) return;
+  try {
+    await appendToSavedPlaylist(saved, fresh);
+  } catch (error) {
+    console.error("Could not update the direct-play playlist:", error);
+    notice(`Couldn't add the new tracks to "${saved.name}". They're in the current playlist only.`, true);
+  }
+}
+
 function forgetDropped(paths) {
-  const kept = new Set(paths);
+  // Tracks of saved direct-play playlists stay playable even when they leave the current playlist.
+  const kept = new Set([...paths, ...savedPlaylists.filter(isDirectPlaylist).flatMap(saved => saved.tracks.map(track => track.path))]);
   for (const key of dropped.keys()) {
     if (!kept.has(key) && key !== player.path) {
       dropped.delete(key);
@@ -1715,7 +1781,7 @@ async function dropToPlaylist(dataTransfer) {
       }
       const file = handle ? await handle.getFile() : files[i];
       if (!file) continue;
-      if (isAudioFile(file.name)) found.push({ file, relative: file.name, label: file.name });
+      if (isAudioFile(file.name)) found.push({ file, handle, relative: file.name, label: file.name });
       else if (/\.txt$/i.test(file.name)) texts.push(file);
     }
   } catch (error) {
@@ -1729,18 +1795,50 @@ async function dropToPlaylist(dataTransfer) {
   }
   const baseName = name => name.replace(/\.[^.]*$/, "").toLocaleLowerCase();
   const keys = found.map(item => {
-    const key = `drop:${++droppedCount}/${item.label}`;
+    // Unique across reloads, since direct-play playlists keep these keys.
+    const key = `drop:${crypto.randomUUID().slice(0, 8)}/${item.label}`;
     const name = item.relative.split("/").pop();
     const lyricsFile = item.file && texts.find(text => baseName(text.name) === baseName(name));
     dropped.set(key, { ...item, lyricsFile, track: { path: key, title: name.replace(/\.[^.]*$/, ""), artist: "", album: "", trackNumber: null, year: null, duration: null } });
     return key;
   });
-  if (!await updatePlaylist([...playlistPaths(), ...keys])) {
-    for (const key of keys) dropped.delete(key);
-    if (busy) notice("Wait for the current task to finish, then drop again.", true);
-    return;
+  const count = `${keys.length.toLocaleString()} ${keys.length === 1 ? "track" : "tracks"}`;
+  let message;
+  if (!playlistPaths().length) {
+    // An empty current playlist becomes a new direct-play playlist, named after a single dropped folder.
+    const folders = [...new Set(found.map(item => item.directory?.name ?? null))];
+    const folderName = folders.length === 1 && folders[0] ? folders[0] : null;
+    const names = savedPlaylists.map(saved => saved.name);
+    let name = folderName ? uniquePlaylistName(folderName, names) : null;
+    for (let number = 1; !name; number++) {
+      const candidate = `Direct play ${String(number).padStart(3, "0")}`;
+      if (!names.some(existing => existing.toLocaleLowerCase() === candidate.toLocaleLowerCase())) name = candidate;
+    }
+    const saved = { id: crypto.randomUUID(), name, instant: true, sources: [], tracks: keys.map(trackSnapshot), savedAt: Date.now() };
+    try {
+      await saveSavedPlaylist(saved);
+    } catch (error) {
+      console.error("Could not save the direct-play playlist:", error);
+      for (const key of keys) dropped.delete(key);
+      notice("Couldn't save the new playlist. Check your browser's storage settings and try again.", true);
+      return;
+    }
+    savedPlaylists = [...savedPlaylists, saved];
+    if (!await updatePlaylist(keys, { loadedPlaylistId: saved.id })) {
+      if (busy) notice(`Saved "${name}". Wait for the current task to finish, then load it.`, true);
+      return;
+    }
+    message = `Created playlist "${name}" with ${count}. Dropped music plays from its files and isn't added to the library.`;
+  } else {
+    const direct = savedPlaylists.find(saved => saved.id === loadedPlaylistId() && isDirectPlaylist(saved));
+    if (!await updatePlaylist([...playlistPaths(), ...keys])) {
+      for (const key of keys) dropped.delete(key);
+      if (busy) notice("Wait for the current task to finish, then drop again.", true);
+      return;
+    }
+    message = direct ? `Added ${count} to "${direct.name}".` : `Added ${count}. Dropped music plays from its files and isn't added to the library.`;
   }
-  notice(`Added ${keys.length.toLocaleString()} dropped ${keys.length === 1 ? "track" : "tracks"}. ${keys.length === 1 ? "It plays" : "They play"} from the dropped files and ${keys.length === 1 ? "isn't" : "aren't"} added to the library.`);
+  notice(message);
   if (!player.path || player.audio.paused) playTrack(keys[0]);
   let lastRender = Date.now();
   for (const key of keys) {
@@ -1762,6 +1860,16 @@ async function dropToPlaylist(dataTransfer) {
     if (Date.now() - lastRender > 400) {
       lastRender = Date.now();
       render();
+    }
+  }
+  const keySet = new Set(keys);
+  for (const saved of savedPlaylists.filter(item => isDirectPlaylist(item) && item.tracks.some(track => keySet.has(track.path)))) {
+    const updated = { ...saved, tracks: saved.tracks.map(track => keySet.has(track.path) ? trackSnapshot(track.path) : track) };
+    try {
+      await saveSavedPlaylist(updated);
+      savedPlaylists = savedPlaylists.map(item => item.id === saved.id ? updated : item);
+    } catch (error) {
+      console.error("Could not update the playlist's track details:", error);
     }
   }
   render();
@@ -1829,11 +1937,11 @@ async function playTrack(path) {
   const drop = dropped.get(path);
   if (drop) {
     try {
-      await player.play(null, path, { file: await droppedFile(drop) });
+      await player.play(null, path, { file: await droppedFile(drop, { ask: true }) });
     } catch (error) {
       if (error.name === "AbortError") return;
       console.error("Playback failed:", error);
-      notice("Couldn't play this dropped file. It may have been moved, removed, or be unsupported.", true);
+      notice(error.name === "NotAllowedError" || error.name === "SecurityError" ? "Access to this file wasn't granted. Play it again to allow access." : "Couldn't play this dropped file. It may have been moved, removed, or be unsupported.", true);
     }
     return;
   }
@@ -2208,7 +2316,7 @@ elements["save-playlist"].addEventListener("click", () => {
   elements["generate-form"].classList.add("hidden");
   if (elements["save-form"].classList.contains("hidden")) {
     elements["save-form"].classList.remove("hidden");
-    const loaded = savedPlaylists.find(item => item.id === library?.loadedPlaylistId);
+    const loaded = savedPlaylists.find(item => item.id === loadedPlaylistId());
     elements["playlist-name"].value = loaded?.name || "";
   }
   elements["playlist-name"].focus();
@@ -2548,10 +2656,11 @@ async function init() {
   try {
     const [storedLibrary, storedPlaylists] = await Promise.all([loadLibrary(), loadSavedPlaylists()]);
     library = migrateLibrary(storedLibrary);
-    // Dropped music was only in memory; its playlist entries can't be played after a reload.
-    if (library?.playlist.some(isDropped)) library = { ...library, playlist: library.playlist.filter(path => !isDropped(path)) };
-    if (library && library !== storedLibrary) await saveLibrary(library);
     savedPlaylists = storedPlaylists.map(migrateSavedPlaylist);
+    for (const saved of savedPlaylists.filter(isDirectPlaylist)) registerDirectTracks(saved);
+    // Dropped music not kept by a direct-play playlist was only in memory and can't be played after a reload.
+    if (library?.playlist.some(path => isDropped(path) && !dropped.has(path))) library = { ...library, playlist: library.playlist.filter(path => !isDropped(path) || dropped.has(path)) };
+    if (library && library !== storedLibrary) await saveLibrary(library);
     // Show the library right away; access checks follow.
     validateRoute();
     render();

@@ -51,7 +51,8 @@ export function serializePlaylists(playlists) {
     version: 2,
     playlists: playlists.map(({ name, sources, tracks }) => {
       const names = new Map(sources.map(source => [source.id, source.name]));
-      return { name, tracks: tracks.map(track => ({ ...track, source: names.get(splitKey(track.path).sourceId) || "", path: relativePath(track.path) })) };
+      // File handles of directly played music can't go in a file.
+      return { name, tracks: tracks.map(({ handle, directory, relative, ...track }) => ({ ...track, source: names.get(splitKey(track.path).sourceId) || "", path: relativePath(track.path) })) };
     })
   }, null, 2);
 }
@@ -134,6 +135,8 @@ export async function resolvePlaylist(saved, library) {
   const missing = new Set();
   const paths = saved.tracks.map(track => {
     const { sourceId, path } = splitKey(track.path);
+    // Directly played (dropped) music isn't from a library source; its key is used as is.
+    if (sourceId === "drop") return track.path;
     const target = mapping.get(sourceId);
     if (!target) {
       missing.add(saved.sources.find(source => source.id === sourceId)?.name || "an unknown folder");
