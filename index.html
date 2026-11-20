@@ -212,9 +212,11 @@
               <p id="now-artist" class="mt-1 h-6 truncate text-base text-soft"></p>
             </div>
             <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-soft">
-              <span id="elapsed" class="w-10 shrink-0">0:00</span>
+              <span id="elapsed" class="w-10 shrink-0 text-center">0:00</span>
               <label for="seek" class="sr-only">Playback position</label><input id="seek" type="range" min="0" max="0" value="0" step="0.1" disabled class="min-w-0 flex-1 accent-primary">
-              <span id="playback-duration" class="w-10 shrink-0 text-right">—</span>
+              <span id="playback-duration" class="w-10 shrink-0 text-center">—</span>
+              <button id="speed" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="speed-menu" aria-label="Playback speed 1×" title="Playback speed" class="group ml-5 flex h-7 shrink-0 items-center gap-0.5 rounded-md border border-bd-in bg-field pl-2 pr-1 text-sm font-medium text-fg-2 hover:bg-tint-2 aria-expanded:border-primary data-[changed]:border-bd-acc data-[changed]:bg-accent-soft data-[changed]:text-deep"><span id="speed-label">1×</span><svg aria-hidden="true" class="h-3.5 w-3.5 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
+              <div id="speed-menu" role="menu" aria-label="Playback speed" class="fixed z-50 hidden min-w-[6rem] rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg"></div>
             </div>
             <div class="mt-4 flex items-center gap-2">
               <button id="stop" type="button" aria-label="Stop" title="Stop" disabled class="flex h-10 w-11 shrink-0 items-center justify-center rounded-md border border-bd-in bg-field hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-5 w-5"><use href="#icon-stop"></use></svg></button>

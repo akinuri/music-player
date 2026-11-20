@@ -12,7 +12,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -2448,6 +2448,92 @@ elements["play-pause"].addEventListener("click", async () => {
   }
 });
 elements.seek.addEventListener("input", () => { player.audio.currentTime = Number(elements.seek.value); });
+
+// Playback speed: a small menu of presets next to the time. Remembered per browser; pitch is kept by the browser.
+const SPEEDS = [0.5, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+let playbackSpeed = 1;
+try {
+  const stored = Number(localStorage.getItem("playbackSpeed"));
+  if (SPEEDS.includes(stored)) playbackSpeed = stored;
+} catch {}
+
+function applySpeed() {
+  // The default rate is what a newly loaded track starts with; loading resets the current rate to it.
+  player.audio.defaultPlaybackRate = playbackSpeed;
+  player.audio.playbackRate = playbackSpeed;
+  const text = `${playbackSpeed}×`;
+  elements["speed-label"].textContent = text;
+  elements.speed.setAttribute("aria-label", `Playback speed ${text}`);
+  elements.speed.toggleAttribute("data-changed", playbackSpeed !== 1);
+  for (const item of elements["speed-menu"].children) item.setAttribute("aria-checked", String(Number(item.dataset.speed) === playbackSpeed));
+}
+
+function setSpeed(speed) {
+  playbackSpeed = speed;
+  try { localStorage.setItem("playbackSpeed", String(speed)); } catch {}
+  applySpeed();
+}
+
+elements["speed-menu"].replaceChildren(...SPEEDS.map(speed => {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.setAttribute("role", "menuitemradio");
+  item.dataset.speed = speed;
+  item.tabIndex = -1;
+  item.className = "group flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left tabular-nums hover:bg-tint focus-visible:bg-tint focus-visible:outline-none aria-checked:font-semibold aria-checked:text-deep";
+  item.innerHTML = `<span>${speed}×</span><svg aria-hidden="true" class="invisible h-4 w-4 group-aria-checked:visible"><use href="#icon-added"></use></svg>`;
+  return item;
+}));
+
+function openSpeedMenu() {
+  const menu = elements["speed-menu"];
+  menu.classList.remove("hidden");
+  const bounds = elements.speed.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(bounds.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 4))}px`;
+  const below = bounds.bottom + 4;
+  menu.style.top = `${below + menu.offsetHeight > window.innerHeight - 4 ? Math.max(4, bounds.top - menu.offsetHeight - 4) : below}px`;
+  elements.speed.setAttribute("aria-expanded", "true");
+  (menu.querySelector("[aria-checked=true]") || menu.firstElementChild).focus();
+}
+
+function closeSpeedMenu(focusButton = false) {
+  if (elements["speed-menu"].classList.contains("hidden")) return;
+  elements["speed-menu"].classList.add("hidden");
+  elements.speed.setAttribute("aria-expanded", "false");
+  if (focusButton) elements.speed.focus();
+}
+
+elements.speed.addEventListener("click", () => {
+  if (elements["speed-menu"].classList.contains("hidden")) openSpeedMenu();
+  else closeSpeedMenu();
+});
+elements["speed-menu"].addEventListener("click", event => {
+  const item = event.target.closest("[data-speed]");
+  if (!item) return;
+  setSpeed(Number(item.dataset.speed));
+  closeSpeedMenu(true);
+});
+elements["speed-menu"].addEventListener("keydown", event => {
+  const items = [...elements["speed-menu"].children];
+  const index = items.indexOf(document.activeElement);
+  const moves = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 };
+  if (event.key in moves) {
+    event.preventDefault();
+    items[Math.max(0, Math.min(items.length - 1, moves[event.key]))].focus();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeSpeedMenu(true);
+  } else if (event.key === "Tab") {
+    closeSpeedMenu();
+  }
+});
+document.addEventListener("pointerdown", event => {
+  if (!event.target.closest("#speed, #speed-menu")) closeSpeedMenu();
+});
+window.addEventListener("resize", () => closeSpeedMenu());
+document.addEventListener("scroll", () => closeSpeedMenu(), true);
+applySpeed();
 
 player.audio.addEventListener("timeupdate", () => saveSession());
 player.audio.addEventListener("play", () => saveSession(true));
