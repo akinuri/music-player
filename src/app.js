@@ -655,7 +655,18 @@ function renderPlaylistStats() {
     : playlistStats === "remaining" ? paths.slice(index + 1)
     : paths;
   elements["playlist-count"].textContent = `${part.length.toLocaleString()} ${part.length === 1 ? "Track" : "Tracks"}`;
-  elements["playlist-duration"].textContent = formatTotal(part.map(path => trackFor(path) || { duration: null }));
+  // Shown as listening time (playback speed and cut applied); the tooltip gives the tracks' own length when it differs.
+  const tracks = part.map(path => trackFor(path) || { duration: null });
+  const shown = formatTotal(tracks.map(track => ({ duration: listeningSeconds(track.duration) })));
+  const original = formatTotal(tracks);
+  const durationPill = elements["playlist-duration"];
+  durationPill.textContent = shown;
+  const tip = shown === original ? "" : `Original length: ${original}`;
+  // Only touch the title when it changes; this runs on every playback tick.
+  if (durationPill.dataset.lastTip !== tip) {
+    durationPill.dataset.lastTip = tip;
+    durationPill.title = tip;
+  }
   for (const tab of elements["playlist-stats-tabs"].children) tab.setAttribute("aria-selected", String(tab.dataset.stats === playlistStats));
 }
 elements["playlist-stats-tabs"].addEventListener("click", event => {
@@ -2525,6 +2536,7 @@ function setSpeed(speed) {
   playbackSpeed = speed;
   try { localStorage.setItem("playbackSpeed", String(speed)); } catch {}
   applySpeed();
+  renderPlaylistStats();
 }
 
 elements["speed-menu"].replaceChildren(...SPEEDS.map(speed => {
@@ -2689,6 +2701,15 @@ function setSkipAfter(value) {
   try { localStorage.setItem("skipAfter", String(skipAfter)); } catch {}
   if (skipAfter === 0) cancelSkipFade();
   renderSkipAfter();
+  renderPlaylistStats();
+}
+
+// How long a track takes to listen to: up to the cut point plus the fade (which runs in real time while playback goes
+// on at the current speed), never more than the whole track, at the playback speed.
+function listeningSeconds(duration) {
+  if (!Number.isFinite(duration)) return duration;
+  const played = skipAfter > 0 ? Math.min(duration, duration * skipAfter / 100 + SKIP_FADE_SECONDS * playbackSpeed) : duration;
+  return played / playbackSpeed;
 }
 
 player.audio.addEventListener("timeupdate", () => {
