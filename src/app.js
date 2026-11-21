@@ -12,7 +12,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "mute", "volume", "volume-value"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -2606,8 +2606,138 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") saveSession(true);
 });
 
+// Cut ("skip after" internally): once a track has played this share of its length, it fades out and the next one starts. 0 is off.
+// Playing anywhere past the point, reached naturally or by moving the playing thumb there, fades out and moves on.
+const SKIP_FADE_SECONDS = 3;
+let skipAfter = 0;
+try {
+  const stored = Number(localStorage.getItem("skipAfter"));
+  // An earlier version stored "off" as 100.
+  if (Number.isInteger(stored) && stored >= 0 && stored < 100 && stored % 5 === 0) skipAfter = stored;
+} catch {}
+// The fade in progress: the track, the listener's volume to restore, and when it started.
+let skipFade = null;
+
+// The volume the listener set, even while a fade has lowered the actual one.
+function listenerVolume() {
+  return skipFade ? skipFade.volume : player.audio.volume;
+}
+
+function cancelSkipFade() {
+  if (!skipFade) return;
+  clearInterval(skipFade.timer);
+  const { volume } = skipFade;
+  skipFade = null;
+  player.audio.volume = volume;
+}
+
+function startSkipFade() {
+  const fade = { path: player.path, volume: player.audio.volume, start: performance.now() };
+  fade.timer = setInterval(() => {
+    // Pausing, stopping or another track ends the fade with the volume restored.
+    if (skipFade !== fade || player.path !== fade.path || player.audio.paused) return cancelSkipFade();
+    const progress = (performance.now() - fade.start) / (SKIP_FADE_SECONDS * 1000);
+    if (progress < 1) {
+      player.audio.volume = fade.volume * (1 - progress);
+      return;
+    }
+    const paths = playlistPaths();
+    const hasNext = paths.indexOf(player.path) >= 0 && paths.indexOf(player.path) < paths.length - 1;
+    player.audio.pause();
+    cancelSkipFade();
+    if (hasNext) advance(1);
+  }, 50);
+  skipFade = fade;
+}
+
+// The cut is set with a scissors handle on the progress slider, dragged in from the right end: cutting 30% means skipping
+// after 70%. No cut (the handle at the end) is off.
+const cutAmount = () => (skipAfter === 0 ? 0 : 100 - skipAfter);
+
+function renderSkipAfter() {
+  const cut = cutAmount();
+  const handle = elements["cut-handle"];
+  handle.style.left = `calc(8px + (100% - 16px) * ${1 - cut / 100})`;
+  handle.setAttribute("aria-valuenow", String(cut));
+  handle.setAttribute("aria-valuetext", cut ? `Cut the last ${cut}%: fade out at ${skipAfter}% and play the next track` : "No cut");
+  handle.title = cut ? `Cut the last ${cut}%: fades out at ${skipAfter}% and plays the next track` : "Drag left to cut the end of each track";
+  handle.toggleAttribute("data-active", cut > 0);
+  renderSkipMarker();
+}
+
+function setCut(cut) {
+  const clamped = Math.min(95, Math.max(0, Math.round(cut / 5) * 5));
+  setSkipAfter(clamped === 0 ? 0 : 100 - clamped);
+}
+
+// The cut part of the progress slider is masked: clear at the cut point, turning into a translucent wash (the card's
+// surface color, white in the light theme) over the fade. The thumb (16px) is inset at both ends of the track, hence the offset.
+function renderSkipMarker() {
+  const marker = elements["cut-zone"];
+  marker.classList.toggle("hidden", skipAfter === 0);
+  if (skipAfter === 0) return;
+  const start = skipAfter / 100;
+  const { duration } = player.audio;
+  // The fade's share of the band; without a known track length, a short default.
+  const fade = Number.isFinite(duration) && duration > 0 ? Math.min(1, SKIP_FADE_SECONDS / (duration * (1 - start))) : 0.15;
+  marker.style.left = `calc(8px + (100% - 16px) * ${start})`;
+  marker.style.background = `linear-gradient(to right, rgb(var(--c-surface) / 0), rgb(var(--c-surface) / 0.7) ${(fade * 100).toFixed(2)}%, rgb(var(--c-surface) / 0.7))`;
+}
+
+function setSkipAfter(value) {
+  skipAfter = Math.min(95, Math.max(0, value));
+  try { localStorage.setItem("skipAfter", String(skipAfter)); } catch {}
+  if (skipAfter === 0) cancelSkipFade();
+  renderSkipAfter();
+}
+
+player.audio.addEventListener("timeupdate", () => {
+  const { currentTime, duration, paused } = player.audio;
+  const point = duration * skipAfter / 100;
+  const crossed = skipAfter > 0 && !skipFade && !paused && Number.isFinite(duration) && currentTime >= point;
+  if (crossed) startSkipFade();
+});
+player.audio.addEventListener("seeking", cancelSkipFade);
+// The fade's share of the band depends on the track's length.
+player.audio.addEventListener("durationchange", renderSkipMarker);
+player.audio.addEventListener("emptied", renderSkipMarker);
+// Dragging the handle: its position along the track (thumb insets excluded) sets the cut, in steps of 5%.
+elements["cut-handle"].addEventListener("pointerdown", event => {
+  event.preventDefault();
+  const handle = elements["cut-handle"];
+  handle.focus();
+  handle.setPointerCapture(event.pointerId);
+  const move = moveEvent => {
+    const bounds = handle.parentElement.getBoundingClientRect();
+    const position = (moveEvent.clientX - bounds.left - 8) / Math.max(1, bounds.width - 16);
+    setCut((1 - position) * 100);
+  };
+  const stop = () => {
+    handle.removeEventListener("pointermove", move);
+    handle.removeEventListener("pointerup", stop);
+    handle.removeEventListener("pointercancel", stop);
+  };
+  handle.addEventListener("pointermove", move);
+  handle.addEventListener("pointerup", stop);
+  handle.addEventListener("pointercancel", stop);
+});
+// Keys follow the handle's direction on screen: left cuts more, right less.
+elements["cut-handle"].addEventListener("keydown", event => {
+  const cut = cutAmount();
+  const next = { ArrowLeft: cut + 5, ArrowDown: cut + 5, ArrowRight: cut - 5, ArrowUp: cut - 5, PageDown: cut + 20, PageUp: cut - 20, Home: 0, End: 95 }[event.key];
+  if (next === undefined) return;
+  event.preventDefault();
+  setCut(next);
+});
+elements["cut-handle"].addEventListener("wheel", event => {
+  event.preventDefault();
+  setCut(cutAmount() + (event.deltaY < 0 ? 5 : -5));
+}, { passive: false });
+renderSkipAfter();
+
 function renderVolume() {
-  const { volume, muted } = player.audio;
+  const volume = listenerVolume();
+  const { muted } = player.audio;
   const level = muted ? 0 : Math.round(volume * 100);
   elements.volume.value = String(level);
   elements.volume.title = `Volume ${level}%`;
@@ -2620,7 +2750,7 @@ function renderVolume() {
 
 function saveVolume() {
   try {
-    localStorage.setItem("volume", JSON.stringify({ volume: player.audio.volume, muted: player.audio.muted }));
+    localStorage.setItem("volume", JSON.stringify({ volume: listenerVolume(), muted: player.audio.muted }));
   } catch (error) {
     console.error("Could not save volume:", error);
   }
@@ -2638,6 +2768,7 @@ player.audio.addEventListener("volumechange", () => {
   saveVolume();
 });
 function setVolumeLevel(level) {
+  cancelSkipFade();
   player.audio.muted = level === 0;
   if (level > 0) player.audio.volume = level / 100;
   renderVolume();
@@ -2648,11 +2779,12 @@ elements.volume.addEventListener("wheel", event => {
   event.preventDefault();
   // The wheel moves in steps of 5, landing on multiples of 5 (e.g. 34 → 35 → 40); dragging keeps the slider's finer step.
   const WHEEL_STEP = 5;
-  const current = player.audio.muted ? 0 : Math.round(player.audio.volume * 100);
+  const current = player.audio.muted ? 0 : Math.round(listenerVolume() * 100);
   const next = event.deltaY < 0 ? Math.floor(current / WHEEL_STEP) * WHEEL_STEP + WHEEL_STEP : Math.ceil(current / WHEEL_STEP) * WHEEL_STEP - WHEEL_STEP;
   setVolumeLevel(Math.min(100, Math.max(0, next)));
 }, { passive: false });
 elements.mute.addEventListener("click", () => {
+  cancelSkipFade();
   if (player.audio.muted || player.audio.volume === 0) {
     player.audio.muted = false;
     if (player.audio.volume === 0) player.audio.volume = 0.5;
