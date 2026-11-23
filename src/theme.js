@@ -41,6 +41,12 @@ export function themeColor(name, alpha = 1) {
   return `rgb(${triplets.get(name)} / ${alpha})`;
 }
 
+// The same theme color as [r, g, b] (0-255), for code that can't take CSS color strings (WebGL).
+export function themeRgb(name) {
+  themeColor(name);
+  return triplets.get(name).split(/\s+/).map(Number);
+}
+
 let preference = "system";
 
 export function currentPreference() {

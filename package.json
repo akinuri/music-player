@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify && esbuild src/app.js --bundle --format=esm --outfile=dist/app.js --minify",
+    "build": "tailwindcss -i ./src/styles.css -o ./dist/styles.css --minify && esbuild src/app.js --bundle --format=esm --outfile=dist/app.js --minify && esbuild src/terrain.js --bundle --format=esm --outfile=dist/terrain.js --minify",
     "test": "node --test"
   },
   "dependencies": {
     "jsmediatags": "^3.9.7",
+    "three": "^0.170.0",
     "tippy.js": "^6.3.7"
   },
   "devDependencies": {

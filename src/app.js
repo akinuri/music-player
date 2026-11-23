@@ -46,7 +46,7 @@ const player = new Playback({
     notice("Couldn't play this file. It may be missing, unreadable, or unsupported.", true);
   }
 });
-const visualizer = new Visualizer(player.audio, $("visualizer-canvas"));
+const visualizer = new Visualizer(player.audio, $("visualizer-canvas"), $("visualizer-stage"));
 
 const NOTICE_DURATION = 5000;
 const ERROR_NOTICE_DURATION = NOTICE_DURATION * 10;
@@ -2342,6 +2342,57 @@ elements["nav-playlists"].addEventListener("click", () => { currentView = "playl
 elements["nav-analysis"].addEventListener("click", () => { currentView = "analysis"; render(); });
 elements["nav-visualizer"].addEventListener("click", () => { currentView = "visualizer"; render(); });
 elements["nav-lyrics"].addEventListener("click", () => { currentView = "lyrics"; render(); });
+
+// Visualizer mode: 2D bars or the 3D terrain (three.js, loaded on first use). Remembered per browser.
+const vizModeButtons = [...document.querySelectorAll("[data-viz-mode]")];
+function setVisualizerMode(mode) {
+  visualizer.setMode(mode);
+  const is3d = visualizer.mode === "3d";
+  // Invisible rather than hidden: the canvas keeps its size for when 2D comes back.
+  $("visualizer-canvas").classList.toggle("invisible", is3d);
+  $("visualizer-stage").classList.toggle("hidden", !is3d);
+  $("visualizer-hint").classList.toggle("hidden", !is3d);
+  $("visualizer-sheet-control").classList.toggle("hidden", !is3d);
+  $("visualizer-sheet-control").classList.toggle("flex", is3d);
+  for (const button of vizModeButtons) button.setAttribute("aria-pressed", String(button.dataset.vizMode === visualizer.mode));
+  try { localStorage.setItem("visualizerMode", visualizer.mode); } catch {}
+}
+visualizer.onTerrainError = () => {
+  notice("Couldn't load the 3D visualizer. Showing the bars instead.", true);
+  setVisualizerMode("2d");
+};
+for (const button of vizModeButtons) button.addEventListener("click", () => setVisualizerMode(button.dataset.vizMode));
+
+// Smoothing of the wave (both views), 0-100%, remembered per browser.
+function setVisualizerSmoothing(percent) {
+  const value = Math.min(100, Math.max(0, Math.round(percent / 5) * 5));
+  visualizer.setSmoothing(value / 100);
+  $("visualizer-smooth").value = String(value);
+  $("visualizer-smooth-value").textContent = value ? `${value}%` : "Off";
+  try { localStorage.setItem("visualizerSmoothing", String(value)); } catch {}
+}
+$("visualizer-smooth").addEventListener("input", event => setVisualizerSmoothing(Number(event.target.value)));
+$("visualizer-smooth").addEventListener("wheel", event => {
+  event.preventDefault();
+  setVisualizerSmoothing(Number($("visualizer-smooth").value) + (event.deltaY < 0 ? 5 : -5));
+}, { passive: false });
+try { setVisualizerSmoothing(Number(localStorage.getItem("visualizerSmoothing")) || 0); } catch { setVisualizerSmoothing(0); }
+
+// The 3D history as bars (Off) or a smooth sheet, blended over more time the higher it goes. Remembered per browser.
+function setVisualizerSheet(percent) {
+  const value = Math.min(100, Math.max(0, Math.round(percent / 5) * 5));
+  visualizer.setSheet(value / 100);
+  $("visualizer-sheet").value = String(value);
+  $("visualizer-sheet-value").textContent = value ? `${value}%` : "Off";
+  try { localStorage.setItem("visualizerSheet", String(value)); } catch {}
+}
+$("visualizer-sheet").addEventListener("input", event => setVisualizerSheet(Number(event.target.value)));
+$("visualizer-sheet").addEventListener("wheel", event => {
+  event.preventDefault();
+  setVisualizerSheet(Number($("visualizer-sheet").value) + (event.deltaY < 0 ? 5 : -5));
+}, { passive: false });
+try { setVisualizerSheet(Number(localStorage.getItem("visualizerSheet")) || 0); } catch { setVisualizerSheet(0); }
+try { setVisualizerMode(localStorage.getItem("visualizerMode")); } catch { setVisualizerMode("2d"); }
 // The year chart only scrolls sideways, so a vertical wheel scrolls it horizontally (until it reaches an end).
 elements["analysis-chart"].addEventListener("wheel", event => {
   const chart = elements["analysis-chart"];
