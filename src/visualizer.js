@@ -9,6 +9,11 @@ const FONT = "11px ui-monospace, SFMono-Regular, Consolas, monospace";
 // Both views show the analyser's full range, from its first band up to half the sample rate (the top of the audio),
 // as the same fixed number of log-spaced bars, whatever the size of the panel.
 const BANDS = 96;
+// Drawing rests this long after the last change while nothing plays (pause, settings, hover, camera), once peaks,
+// ghost and camera have settled; the GPU then sits idle until something happens.
+const REST_AFTER_MS = 2500;
+// At most about 60 frames a second: high-refresh screens would otherwise render (and decay the bars) faster for nothing.
+const FRAME_MS = 1000 / 60;
 
 // Log-spaced band edges (Hz): count bands need count + 1 edges.
 export function bandEdges(count, minFreq, maxFreq) {
@@ -72,7 +77,12 @@ export class Visualizer {
     this.visible = false;
     this.smoothing = 0;
     this.sheet = 0;
-    audio.addEventListener("play", () => this.resumeRecording());
+    this.awakeUntil = 0;
+    this.lastFrame = 0;
+    this.tick = time => this.draw(time);
+    for (const type of ["play", "pause", "seeked", "emptied", "loadedmetadata"]) audio.addEventListener(type, () => this.wake());
+    // A theme change restyles <html>; redraw in the new colors even while resting.
+    new MutationObserver(() => this.wake()).observe(document.documentElement, { attributes: true });
     this.context = null;
     this.analyser = null;
     this.data = null;
@@ -87,8 +97,12 @@ export class Visualizer {
     canvas.addEventListener("pointermove", event => {
       const bounds = canvas.getBoundingClientRect();
       this.hover = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+      this.wake();
     });
-    canvas.addEventListener("pointerleave", () => { this.hover = null; });
+    canvas.addEventListener("pointerleave", () => {
+      this.hover = null;
+      this.wake();
+    });
   }
 
   get sampleRate() {
@@ -117,7 +131,7 @@ export class Visualizer {
   start() {
     this.visible = true;
     this.connect();
-    if (!this.frame) this.frame = requestAnimationFrame(() => this.draw());
+    this.wake();
   }
 
   // Leaving the visualizer stops drawing. Once the 3D terrain exists, analysis keeps running while music plays so the
@@ -129,14 +143,17 @@ export class Visualizer {
     this.frame = 0;
   }
 
-  resumeRecording() {
-    if (this.terrain && !this.frame) this.frame = requestAnimationFrame(() => this.draw());
+  // Something changed: draw for a while (or record, once the 3D terrain exists and music plays).
+  wake() {
+    this.awakeUntil = performance.now() + REST_AFTER_MS;
+    if (!this.frame && (this.visible || (this.terrain && !this.audio.paused))) this.frame = requestAnimationFrame(this.tick);
   }
 
   // Smoothing strength, 0-1: blurs across up to ±3 bands and averages over a longer window (shared by both views).
   setSmoothing(strength) {
     this.smoothing = Math.min(1, Math.max(0, strength));
     if (this.analyser) this.analyser.smoothingTimeConstant = this.timeSmoothing();
+    this.wake();
   }
 
   timeSmoothing() {
@@ -147,10 +164,12 @@ export class Visualizer {
   setSheet(strength) {
     this.sheet = strength;
     this.terrain?.setSheet(strength);
+    this.wake();
   }
 
   setMode(mode) {
     this.mode = mode === "3d" ? "3d" : "2d";
+    this.wake();
   }
 
   // three.js lives in its own bundle next to this one; it's fetched the first time 3D is shown.
@@ -159,6 +178,8 @@ export class Visualizer {
       .then(({ Terrain }) => {
         this.terrain = new Terrain(this.stage, BANDS);
         this.terrain.setSheet(this.sheet);
+        this.terrain.onActivity = () => this.wake();
+        this.wake();
       })
       .catch(error => {
         console.error("Could not load the 3D visualizer:", error);
@@ -212,17 +233,25 @@ export class Visualizer {
     this.terrain.render({ peaks: this.peaks, playing: !this.audio.paused, low: themeRgb("viz-a"), high: themeRgb("viz-b"), peak: themeRgb("viz-peak"), background: themeRgb("surface"), grid: themeRgb("soft") });
   }
 
-  draw() {
-    this.frame = requestAnimationFrame(() => this.draw());
+  draw(time = performance.now()) {
+    this.frame = requestAnimationFrame(this.tick);
+    const elapsed = time - this.lastFrame;
+    if (elapsed < FRAME_MS - 2) return;
+    this.lastFrame = time - (elapsed % FRAME_MS);
     const { edges, minFreq, maxFreq, count } = this.analyse();
     this.recordTerrain([minFreq, maxFreq]);
     if (!this.visible) {
-      // Recording in the background: rest once playback pauses (resumeRecording starts again on play).
+      // Recording in the background: rest once playback pauses (wake starts again on play).
       if (this.audio.paused) {
         cancelAnimationFrame(this.frame);
         this.frame = 0;
       }
       return;
+    }
+    // Paused and settled: this is the last frame until something wakes the view again.
+    if (this.audio.paused && time > this.awakeUntil) {
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
     }
     if (this.mode === "3d") return this.draw3d();
     const { canvas } = this;

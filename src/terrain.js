@@ -87,6 +87,9 @@ export class Terrain {
     // to the panel on every resize so every bar, lowest to highest frequency and full height, is in view.
     // Double-click returns to that fitted view.
     this.fitted = true;
+    // Called whenever the picture changes without the music (camera moves, resizes), so a resting view draws again.
+    this.onActivity = () => {};
+    this.controls.addEventListener("change", () => this.onActivity());
     // Grabbing the view stops refitting, and stops a fly-back midway.
     this.controls.addEventListener("start", () => {
       this.fitted = false;
@@ -95,6 +98,7 @@ export class Terrain {
     canvas.addEventListener("dblclick", () => {
       this.fitted = true;
       this.fit({ fly: true });
+      this.onActivity();
     });
 
     // Unit boxes standing on their base, scaled per bar.
@@ -295,6 +299,7 @@ export class Terrain {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     if (this.fitted) this.fit();
+    this.onActivity();
   }
 
   // The default view for the current point of the song: the angle eased along VIEW_ANGLES, aimed a little into the
@@ -390,7 +395,13 @@ export class Terrain {
   // While the default view is kept (not moved by hand, not flying back), it eases along as the played part grows.
   followFit() {
     if (!this.fitted || this.flight) return;
-    const { position, target } = this.fitView();
+    // The fit only changes with the live row, the song's length and the panel's shape; reuse it between those.
+    const key = `${this.current}|${this.rows}|${this.camera.aspect}`;
+    if (key !== this.fitKey) {
+      this.fitKey = key;
+      this.fitTarget = this.fitView();
+    }
+    const { position, target } = this.fitTarget;
     this.camera.position.lerp(position, 0.08);
     this.controls.target.lerp(target, 0.08);
   }
