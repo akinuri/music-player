@@ -58,7 +58,7 @@
       </div>
       <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <aside class="flex shrink-0 self-stretch flex-col gap-3 lg:max-h-full lg:w-[200px] lg:self-start">
-          <nav class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Music navigation">
+          <nav data-panel class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Music navigation">
             <div class="flex min-h-0 flex-col gap-0.5 lg:overflow-y-auto">
               <button id="nav-library" type="button" class="flex min-w-0 items-center justify-between rounded-md bg-sel px-2.5 py-1.5 text-left text-base font-semibold text-deep hover:bg-accent-soft"><span>Library</span><span id="track-count" class="ml-2 text-deep-2">0</span></button>
               <div class="ml-3 flex flex-col gap-0.5 border-l border-bd pl-2">
@@ -70,12 +70,12 @@
               <div id="playlist-nav-items" class="ml-3 flex flex-col gap-0.5 border-l border-bd pl-2"></div>
             </div>
           </nav>
-          <nav class="flex shrink-0 flex-col gap-0.5 rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Apps">
+          <nav data-panel class="flex shrink-0 flex-col gap-0.5 rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Apps">
             <button id="nav-visualizer" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Visualizer</span></button>
             <button id="nav-lyrics" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Lyrics</span></button>
             <button id="nav-analysis" type="button" class="flex w-full min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Analysis</span></button>
           </nav>
-          <section class="flex shrink-0 flex-col gap-1 rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-labelledby="sources-heading">
+          <section data-panel class="flex shrink-0 flex-col gap-1 rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-labelledby="sources-heading">
             <div id="sources-header" class="-mx-2 -mt-2 flex items-center justify-between gap-2 rounded-t-[11px] border-b border-bd-2 bg-head px-2 py-1.5">
               <h2 id="sources-heading" class="min-w-0"><button id="sources-toggle" type="button" aria-expanded="true" aria-controls="sources-body" class="group flex min-w-0 items-center gap-1.5 rounded-md py-1 pl-1 pr-2 text-sm font-semibold text-fg hover:bg-sel"><svg aria-hidden="true" class="h-4 w-4 shrink-0 text-soft transition-transform group-aria-[expanded=false]:-rotate-90"><use href="#icon-chevron"></use></svg>Sources<span id="sources-count" class="hidden rounded px-1.5 text-xs font-medium"></span></button></h2>
               <button id="choose-folder" type="button" aria-label="Add folder" title="Add folder" class="flex h-8 w-8 origin-center items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 shadow-sm transition-transform duration-150 hover:bg-tint-2 disabled:opacity-40"><svg aria-hidden="true" class="h-[18px] w-[18px]"><use href="#icon-folder-add"></use></svg></button>
@@ -100,7 +100,7 @@
           </div>
         </aside>
 
-        <section id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
+        <section data-panel id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
           <div class="border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
               <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
@@ -149,7 +149,7 @@
           </div>
         </section>
 
-        <section id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
+        <section data-panel id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
             <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
@@ -170,7 +170,7 @@
           </div>
         </section>
 
-        <section id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
+        <section data-panel id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="analysis-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="analysis-title" class="flex flex-wrap items-center gap-x-1.5">Analysis</span></h2>
             <div id="analysis-meta" class="flex flex-wrap gap-2 text-sm"></div>
@@ -186,7 +186,7 @@
           </div>
         </section>
 
-        <section id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
+        <section data-panel id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="visualizer-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Visualizer</h2>
             <div class="ml-auto flex items-center gap-2 text-sm text-soft">
@@ -212,7 +212,7 @@
           </div>
         </section>
 
-        <section id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
+        <section data-panel id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
             <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
@@ -224,7 +224,7 @@
         </section>
 
         <div class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[clamp(380px,32vw,460px)] lg:shrink-0 lg:overflow-y-auto">
-          <section class="shrink-0 rounded-xl border border-bd bg-surface p-5 shadow-sm" aria-label="Playback controls">
+          <section data-panel class="shrink-0 rounded-xl border border-bd bg-surface p-5 shadow-sm" aria-label="Playback controls">
             <div class="min-w-0">
               <p id="now-playing" class="h-6 truncate text-base font-semibold text-fg-2">Nothing playing</p>
               <p id="now-artist" class="mt-1 h-6 truncate text-base text-soft"></p>
@@ -250,7 +250,7 @@
             </div>
           </section>
 
-          <section class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
+          <section data-panel class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
             <div class="flex items-center justify-between gap-3 border-b border-bd-2 bg-head px-4 py-3">
               <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 <h2 id="playlist-heading" tabindex="-1" class="text-base font-semibold">Current playlist</h2>

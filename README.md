@@ -22,6 +22,15 @@ Requires a Chromium-based browser (File System Access API) over HTTPS or localho
 - After a browser restart the library stays visible, but folder access may need **Reconnect** before playing or rescanning. Direct-play playlists may ask for access to their files again.
 - Saved playlists find their tracks by folder (even after a folder is removed and re-added). Clearing site data removes everything.
 
+## Custom themes
+
+The app can be re-themed from outside (e.g. a userscript) through these hooks, which are kept stable:
+
+- Colors are CSS variables on `:root` named `--c-*`, holding `r g b` triplets (e.g. `--c-primary: 49 94 85`). Override them under a more specific selector such as `html:root[data-my-theme]`. Canvases pick up changes to `<html>` attributes on their next draw.
+- `<html data-theme>` is the active built-in theme (`light` / `dark`). The `themechange` event fires on `document` whenever it changes.
+- The theme picker is `#theme-switch`, with one button per `[data-theme-option]`.
+- Panels (sidebar blocks, views, player cards) carry `data-panel`.
+
 ## Run
 
 ```sh

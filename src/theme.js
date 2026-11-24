@@ -72,6 +72,9 @@ export function setPreference(value) {
 
 export function initTheme() {
   preference = readPreference();
+  // Anything that restyles <html> (e.g. a userscript setting its own data-* theme attribute) may change the
+  // color variables, so drop the cached values and let canvases pick up the new ones on their next draw.
+  new MutationObserver(() => triplets.clear()).observe(document.documentElement, { attributes: true });
   window.matchMedia(DARK_QUERY).addEventListener("change", () => {
     if (preference === "system") apply();
   });
