@@ -681,7 +681,8 @@ elements["playlist-stats-tabs"].addEventListener("click", event => {
   renderPlaylistStats();
 });
 
-// Brings the playing track into view when it changes. Only the playlist list scrolls, never the page.
+// Centres the playing track in the playlist when it changes, even if it was already in view. Only the playlist list
+// scrolls, never the page; near the ends it stops where the list does.
 let scrolledPath = null;
 function scrollToPlayingRow() {
   const row = player.path && elements.playlist.querySelector(`[data-path="${CSS.escape(player.path)}"]`);
@@ -691,7 +692,6 @@ function scrollToPlayingRow() {
   scrolledPath = player.path;
   const view = scroller.getBoundingClientRect();
   const bounds = row.getBoundingClientRect();
-  if (bounds.top >= view.top && bounds.bottom <= view.bottom) return;
   const top = scroller.scrollTop + bounds.top - view.top - (view.height - bounds.height) / 2;
   scroller.scrollTo({ top, behavior: "smooth" });
 }
