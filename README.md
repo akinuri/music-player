@@ -10,7 +10,7 @@ Requires a Chromium-based browser (File System Access API) over HTTPS or localho
 - **Library:** browse by artist, album or track; search, sort any column (kept in the address), filter by source, add to the playlist or play from anywhere.
 - **Direct play:** drop music files or folders on the current playlist to play them right away without adding them to the library. Dropped on an empty playlist (or on the playlists' import button), they become an auto-saved playlist that keeps growing while it's loaded.
 - **Playlists:** save, rename, reorder by drag and drop, remove tracks, shuffle in tracks by minutes, import/export as JSON. Total, elapsed and remaining length at a glance.
-- **Playback:** resumes where you left off after a reload; volume and speed remembered. A cut handle on the progress bar fades each track out at a set point and moves on.
+- **Playback:** resumes where you left off after a reload; volume and speed remembered. A cut handle on the progress bar fades each track out at a set point and moves on. A gap setting waits 1–10 s between tracks, or stops after each one (∞).
 - **Lyrics:** read from the MP3's tags or a same-named `.txt` next to it; timed (LRC) lyrics follow along and seek on click.
 - **Visualizer:** live spectrum of the playing track as 2D bars or a rotatable 3D terrain of the recent past; shown after 30 s without input while music plays.
 - **Analysis:** timeline of your library by release year, measured in albums or tracks.

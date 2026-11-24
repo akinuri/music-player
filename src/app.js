@@ -12,7 +12,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -40,7 +40,7 @@ const permissions = new Map();
 let busy = true;
 const player = new Playback({
   onChange: renderPlayback,
-  onEnded: () => advance(1),
+  onEnded: () => finishTrack(),
   onError: error => {
     console.error("Playback failed:", error);
     notice("Couldn't play this file. It may be missing, unreadable, or unsupported.", true);
@@ -657,7 +657,11 @@ function renderPlaylistStats() {
   elements["playlist-count"].textContent = `${part.length.toLocaleString()} ${part.length === 1 ? "Track" : "Tracks"}`;
   // Shown as listening time (playback speed and cut applied); the tooltip gives the tracks' own length when it differs.
   const tracks = part.map(path => trackFor(path) || { duration: null });
-  const shown = formatTotal(tracks.map(track => ({ duration: listeningSeconds(track.duration) })));
+  const listening = tracks.map(track => ({ duration: listeningSeconds(track.duration) }));
+  // Gaps count between tracks: each elapsed track was followed by one, each remaining one is preceded by one.
+  const gaps = Number.isFinite(playbackGap) && playbackGap > 0 ? (playlistStats === "total" ? Math.max(part.length - 1, 0) : part.length) : 0;
+  if (gaps && listening.some(track => Number.isFinite(track.duration))) listening.push({ duration: gaps * playbackGap });
+  const shown = formatTotal(listening);
   const original = formatTotal(tracks);
   const durationPill = elements["playlist-duration"];
   durationPill.textContent = shown;
@@ -1270,6 +1274,7 @@ function render() {
     makeReorderable(row, index, elements.playlist, (from, to) => updatePlaylist(moveItem(paths, from, to)));
     elements.playlist.append(row);
   });
+  renderGapCountdown();
   renderPlayback();
 }
 
@@ -2580,7 +2585,7 @@ function applySpeed() {
   elements["speed-label"].textContent = text;
   elements.speed.setAttribute("aria-label", `Playback speed ${text}`);
   elements.speed.toggleAttribute("data-changed", playbackSpeed !== 1);
-  for (const item of elements["speed-menu"].children) item.setAttribute("aria-checked", String(Number(item.dataset.speed) === playbackSpeed));
+  markSpeed(playbackSpeed);
 }
 
 function setSpeed(speed) {
@@ -2590,66 +2595,164 @@ function setSpeed(speed) {
   renderPlaylistStats();
 }
 
-elements["speed-menu"].replaceChildren(...SPEEDS.map(speed => {
-  const item = document.createElement("button");
-  item.type = "button";
-  item.setAttribute("role", "menuitemradio");
-  item.dataset.speed = speed;
-  item.tabIndex = -1;
-  item.className = "group flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left tabular-nums hover:bg-tint focus-visible:bg-tint focus-visible:outline-none aria-checked:font-semibold aria-checked:text-deep";
-  item.innerHTML = `<span>${speed}×</span><svg aria-hidden="true" class="invisible h-4 w-4 group-aria-checked:visible"><use href="#icon-added"></use></svg>`;
-  return item;
-}));
+// A small preset menu under (or above) its button, like the playback speed's. `items` are [value, text] pairs; picking
+// one calls `onPick` with its value. Returns a function that marks the current value.
+function presetMenu(button, menu, items, onPick) {
+  menu.replaceChildren(...items.map(([value, text], index) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.setAttribute("role", "menuitemradio");
+    item.dataset.index = index;
+    item.tabIndex = -1;
+    item.className = "group flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left tabular-nums hover:bg-tint focus-visible:bg-tint focus-visible:outline-none aria-checked:font-semibold aria-checked:text-deep";
+    item.innerHTML = `<span></span><svg aria-hidden="true" class="invisible h-4 w-4 group-aria-checked:visible"><use href="#icon-added"></use></svg>`;
+    item.firstElementChild.textContent = text;
+    return item;
+  }));
 
-function openSpeedMenu() {
-  const menu = elements["speed-menu"];
-  menu.classList.remove("hidden");
-  const bounds = elements.speed.getBoundingClientRect();
-  menu.style.left = `${Math.max(4, Math.min(bounds.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 4))}px`;
-  const below = bounds.bottom + 4;
-  menu.style.top = `${below + menu.offsetHeight > window.innerHeight - 4 ? Math.max(4, bounds.top - menu.offsetHeight - 4) : below}px`;
-  elements.speed.setAttribute("aria-expanded", "true");
-  (menu.querySelector("[aria-checked=true]") || menu.firstElementChild).focus();
-}
-
-function closeSpeedMenu(focusButton = false) {
-  if (elements["speed-menu"].classList.contains("hidden")) return;
-  elements["speed-menu"].classList.add("hidden");
-  elements.speed.setAttribute("aria-expanded", "false");
-  if (focusButton) elements.speed.focus();
-}
-
-elements.speed.addEventListener("click", () => {
-  if (elements["speed-menu"].classList.contains("hidden")) openSpeedMenu();
-  else closeSpeedMenu();
-});
-elements["speed-menu"].addEventListener("click", event => {
-  const item = event.target.closest("[data-speed]");
-  if (!item) return;
-  setSpeed(Number(item.dataset.speed));
-  closeSpeedMenu(true);
-});
-elements["speed-menu"].addEventListener("keydown", event => {
-  const items = [...elements["speed-menu"].children];
-  const index = items.indexOf(document.activeElement);
-  const moves = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 };
-  if (event.key in moves) {
-    event.preventDefault();
-    items[Math.max(0, Math.min(items.length - 1, moves[event.key]))].focus();
-  } else if (event.key === "Escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    closeSpeedMenu(true);
-  } else if (event.key === "Tab") {
-    closeSpeedMenu();
+  function open() {
+    menu.classList.remove("hidden");
+    const bounds = button.getBoundingClientRect();
+    menu.style.left = `${Math.max(4, Math.min(bounds.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 4))}px`;
+    const below = bounds.bottom + 4;
+    menu.style.top = `${below + menu.offsetHeight > window.innerHeight - 4 ? Math.max(4, bounds.top - menu.offsetHeight - 4) : below}px`;
+    button.setAttribute("aria-expanded", "true");
+    (menu.querySelector("[aria-checked=true]") || menu.firstElementChild).focus();
   }
-});
-document.addEventListener("pointerdown", event => {
-  if (!event.target.closest("#speed, #speed-menu")) closeSpeedMenu();
-});
-window.addEventListener("resize", () => closeSpeedMenu());
-document.addEventListener("scroll", () => closeSpeedMenu(), true);
+
+  function close(focusButton = false) {
+    if (menu.classList.contains("hidden")) return;
+    menu.classList.add("hidden");
+    button.setAttribute("aria-expanded", "false");
+    if (focusButton) button.focus();
+  }
+
+  button.addEventListener("click", () => {
+    if (menu.classList.contains("hidden")) open();
+    else close();
+  });
+  menu.addEventListener("click", event => {
+    const item = event.target.closest("[data-index]");
+    if (!item) return;
+    onPick(items[Number(item.dataset.index)][0]);
+    close(true);
+  });
+  menu.addEventListener("keydown", event => {
+    const children = [...menu.children];
+    const index = children.indexOf(document.activeElement);
+    const moves = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: children.length - 1 };
+    if (event.key in moves) {
+      event.preventDefault();
+      children[Math.max(0, Math.min(children.length - 1, moves[event.key]))].focus();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+    } else if (event.key === "Tab") {
+      close();
+    }
+  });
+  document.addEventListener("pointerdown", event => {
+    if (!button.contains(event.target) && !menu.contains(event.target)) close();
+  });
+  window.addEventListener("resize", () => close());
+  document.addEventListener("scroll", () => close(), true);
+
+  return current => {
+    for (const item of menu.children) item.setAttribute("aria-checked", String(items[Number(item.dataset.index)][0] === current));
+  };
+}
+
+const markSpeed = presetMenu(elements.speed, elements["speed-menu"], SPEEDS.map(speed => [speed, `${speed}×`]), setSpeed);
 applySpeed();
+
+// Gap: how long to wait after a track ends (or its cut fades out) before the next playlist track starts. Infinity
+// stops there instead; Next or Play carry on by hand. Remembered per browser.
+const GAPS = [0, 1, 2, 5, 10, Infinity];
+const gapText = gap => (gap === Infinity ? "∞" : String(gap));
+let playbackGap = 0;
+try {
+  const stored = Number(localStorage.getItem("playbackGap"));
+  if (GAPS.includes(stored)) playbackGap = stored;
+} catch {}
+// The wait in progress: the finished track, its timer and when the next one starts.
+let gapWait = null;
+
+const markGap = presetMenu(elements.gap, elements["gap-menu"], GAPS.map(gap => [gap, gapText(gap)]), setGap);
+
+function renderGap() {
+  elements["gap-label"].textContent = gapText(playbackGap);
+  elements.gap.toggleAttribute("data-changed", playbackGap !== 0);
+  const setting = playbackGap === Infinity ? "stop after each track" : playbackGap ? `${playbackGap} seconds` : "none";
+  elements.gap.setAttribute("aria-label", gapWait ? `Waiting for the next track; wait before the next track: ${setting}` : `Wait before the next track: ${setting}`);
+  markGap(playbackGap);
+}
+
+// The countdown: a line along the finished track's bottom border in the current playlist, shrinking away over the
+// wait. Redrawn (picking up where it is) whenever the playlist rows are rebuilt.
+function renderGapCountdown() {
+  elements.playlist.querySelector("[data-gap-countdown]")?.remove();
+  const row = gapWait && elements.playlist.querySelector(`[data-path="${CSS.escape(gapWait.path)}"]`);
+  if (!row) return;
+  const left = Math.max(0, gapWait.until - performance.now());
+  const line = document.createElement("span");
+  line.dataset.gapCountdown = "";
+  line.setAttribute("aria-hidden", "true");
+  line.className = "pointer-events-none absolute -bottom-px left-0 h-px bg-primary";
+  line.style.width = `${(left / (gapWait.seconds * 1000)) * 100}%`;
+  row.classList.add("relative");
+  row.append(line);
+  line.getBoundingClientRect();
+  line.style.transition = `width ${left}ms linear`;
+  line.style.width = "0";
+}
+
+function setGap(gap) {
+  playbackGap = gap;
+  try { localStorage.setItem("playbackGap", String(gap)); } catch {}
+  // A wait already running keeps going only if there's still something to wait for.
+  if (gapWait) {
+    const { path } = gapWait;
+    cancelGap();
+    if (gap !== Infinity) waitThenAdvance(path, gap);
+  }
+  renderGap();
+  renderPlaylistStats();
+}
+
+function cancelGap() {
+  if (!gapWait) return;
+  clearTimeout(gapWait.timer);
+  gapWait = null;
+  renderGapCountdown();
+  renderGap();
+}
+
+function waitThenAdvance(path, seconds) {
+  const wait = { path, seconds, until: performance.now() + seconds * 1000 };
+  wait.timer = setTimeout(() => {
+    if (gapWait !== wait) return;
+    cancelGap();
+    if (player.path === path) advance(1);
+  }, seconds * 1000);
+  gapWait = wait;
+  renderGapCountdown();
+  renderGap();
+}
+
+// A track is done (ended, or its cut faded out): move on to the next playlist track after the gap.
+function finishTrack() {
+  const paths = playlistPaths();
+  const index = paths.indexOf(player.path);
+  if (index < 0 || index >= paths.length - 1 || playbackGap === Infinity) return;
+  if (playbackGap === 0) advance(1);
+  else waitThenAdvance(player.path, playbackGap);
+}
+
+// Playing anything (this track again, or another) or stopping ends the wait.
+player.audio.addEventListener("play", cancelGap);
+player.audio.addEventListener("emptied", cancelGap);
+renderGap();
 
 player.audio.addEventListener("timeupdate", () => saveSession());
 player.audio.addEventListener("play", () => saveSession(true));
@@ -2704,11 +2807,9 @@ function startSkipFade() {
       player.audio.volume = fade.volume * (1 - progress);
       return;
     }
-    const paths = playlistPaths();
-    const hasNext = paths.indexOf(player.path) >= 0 && paths.indexOf(player.path) < paths.length - 1;
     player.audio.pause();
     cancelSkipFade();
-    if (hasNext) advance(1);
+    finishTrack();
   }, 50);
   skipFade = fade;
 }
