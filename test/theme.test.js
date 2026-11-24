@@ -29,7 +29,7 @@ test("readPreference survives a localStorage global that throws on access", () =
   const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
   Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new DOMException("denied", "SecurityError"); } });
   try {
-    assert.equal(readPreference(), "system");
+    assert.equal(readPreference(), DEFAULT_PREFERENCE);
   } finally {
     if (original) Object.defineProperty(globalThis, "localStorage", original);
     else delete globalThis.localStorage;
