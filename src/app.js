@@ -2531,7 +2531,10 @@ document.addEventListener("scroll", hideContextMenu, true);
 elements.playlist.addEventListener("contextmenu", event => {
   if (!event.target.closest("[data-path]")) event.preventDefault();
 });
-elements["clear-playlist"].addEventListener("click", () => updatePlaylist([]));
+elements["clear-playlist"].addEventListener("click", () => {
+  const count = playlistPaths().length;
+  if (window.confirm(`Clear the current playlist (${count} ${count === 1 ? "track" : "tracks"})?`)) updatePlaylist([]);
+});
 elements["rename-form"].addEventListener("submit", event => {
   event.preventDefault();
   renameSavedPlaylist();
