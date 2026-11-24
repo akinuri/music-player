@@ -194,11 +194,6 @@
               <input id="visualizer-smooth" type="range" min="0" max="100" step="5" value="0" class="w-24 accent-primary">
               <span id="visualizer-smooth-value" class="w-9 tabular-nums">Off</span>
             </div>
-            <div id="visualizer-sheet-control" class="hidden items-center gap-2 text-sm text-soft">
-              <label for="visualizer-sheet" title="Draw the song behind the live slice as one smooth sheet, blended over time">Sheet</label>
-              <input id="visualizer-sheet" type="range" min="0" max="100" step="5" value="0" class="w-24 accent-primary">
-              <span id="visualizer-sheet-value" class="w-9 tabular-nums">Off</span>
-            </div>
             <div id="visualizer-mode" role="group" aria-label="Visualizer mode" class="flex overflow-hidden rounded-md border border-bd-in bg-field text-sm font-medium shadow-sm">
               <button type="button" data-viz-mode="2d" aria-pressed="true" title="Spectrum bars" class="px-3 py-1 text-fg-2 hover:bg-tint-2 aria-pressed:bg-accent-soft aria-pressed:text-deep">2D</button>
               <button type="button" data-viz-mode="3d" aria-pressed="false" title="Spectrum terrain over time" class="border-l border-bd-in px-3 py-1 text-fg-2 hover:bg-tint-2 aria-pressed:bg-accent-soft aria-pressed:text-deep">3D</button>
@@ -208,6 +203,11 @@
             <canvas id="visualizer-canvas" class="absolute left-2 top-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] sm:left-4 sm:w-[calc(100%-2rem)]" aria-hidden="true"></canvas>
             <div id="visualizer-stage" class="absolute inset-0 hidden cursor-grab active:cursor-grabbing" aria-hidden="true"></div>
             <p id="visualizer-hint" class="pointer-events-none absolute left-4 top-3 hidden text-xs text-soft sm:left-6">Drag to rotate · right-drag to pan · scroll to zoom · double-click to reset</p>
+            <div id="visualizer-sheet-control" class="absolute right-4 top-2 z-10 hidden items-center gap-2 rounded-md border border-bd bg-surface/85 px-2 py-1 text-sm text-soft shadow-sm backdrop-blur-sm sm:right-6">
+              <label for="visualizer-sheet" title="Draw the song behind the live slice as one smooth sheet, blended over time">Sheet</label>
+              <input id="visualizer-sheet" type="range" min="0" max="100" step="5" value="0" class="w-24 accent-primary">
+              <span id="visualizer-sheet-value" class="w-9 tabular-nums">Off</span>
+            </div>
             <p id="visualizer-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-soft">Play a track to see it here.</p>
           </div>
         </section>
