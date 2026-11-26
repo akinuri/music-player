@@ -14,7 +14,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-tags", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -1290,15 +1290,16 @@ function render() {
     );
     selected.tracks.forEach((track, index) => {
       const currentTrack = selectedPlaylistPaths ? trackFor(selectedPlaylistPaths[index]) : null;
-      const albumName = track.album || currentTrack?.album;
+      // The library's current details (they may have been edited since), else what the playlist saved.
+      const albumName = currentTrack?.album || track.album;
       const row = itemRow(
         index,
-        track.title || currentTrack?.title || relativePath(track.path),
-        [track.artist || currentTrack?.artist || "Unknown artist", albumName ? albumText({ album: albumName, year: track.year ?? currentTrack?.year }) : ""].filter(Boolean).join(" · "),
+        currentTrack?.title || track.title || relativePath(track.path),
+        [currentTrack?.artist || track.artist || "Unknown artist", albumName ? albumText({ album: albumName, year: currentTrack?.year ?? track.year }) : ""].filter(Boolean).join(" · "),
         formatDuration(track.duration),
         "select-none sm:px-6"
       );
-      setTitle(row.querySelector("[data-title]"), track.title || currentTrack?.title || relativePath(track.path), track.trackNumber ?? currentTrack?.trackNumber);
+      setTitle(row.querySelector("[data-title]"), currentTrack?.title || track.title || relativePath(track.path), currentTrack?.trackNumber ?? track.trackNumber);
       row.addEventListener("dblclick", () => playSavedTrack(selected, index));
       row.tabIndex = 0;
       row.classList.add("focus-visible:outline", "focus-visible:outline-2", "focus-visible:-outline-offset-2", "focus-visible:outline-primary");
@@ -1307,7 +1308,7 @@ function render() {
       });
       row.addEventListener("contextmenu", event => {
         event.preventDefault();
-        openContextMenu(row, () => removeSavedTrack(selected, index), event);
+        openContextMenu(row, () => removeSavedTrack(selected, index), event, selectedPlaylistPaths?.[index]);
       });
       makeReorderable(row, index, elements["saved-playlists"], (from, to) => updateSavedTracks(selected, moveItem(selected.tracks, from, to), "reorder"));
       elements["saved-playlists"].append(row);
@@ -1360,7 +1361,7 @@ function render() {
     });
     row.addEventListener("contextmenu", event => {
       event.preventDefault();
-      openContextMenu(row, () => updatePlaylist(paths.filter((_, i) => i !== index)), event);
+      openContextMenu(row, () => updatePlaylist(paths.filter((_, i) => i !== index)), event, path);
     });
     makeReorderable(row, index, elements.playlist, (from, to) => updatePlaylist(moveItem(paths, from, to)));
     elements.playlist.append(row);
@@ -1451,6 +1452,8 @@ function moveItem(items, from, to) {
 
 let contextRow = null;
 let contextRemove = null;
+// The library track the menu's "Edit tags" opens (null when the row's track can't be edited).
+let contextTagPath = null;
 
 const GENERATE_PRESETS = [5, 10, 15, 20, 25, 30, 45, 60];
 
@@ -1525,12 +1528,20 @@ function hideContextMenu() {
   contextRow?.classList.remove("outline", "outline-2", "-outline-offset-2", "outline-primary");
   contextRow = null;
   contextRemove = null;
+  contextTagPath = null;
 }
 
-function openContextMenu(row, onRemove, event) {
+// Only library MP3s can have their tags edited (not dropped music, nor tracks missing from the library).
+const canEditTags = path => !!path && !isDropped(path) && !!library?.tracks.some(track => track.path === path);
+
+function openContextMenu(row, onRemove, event, tagPath = null) {
   hideContextMenu();
   contextRow = row;
   contextRemove = onRemove;
+  contextTagPath = canEditTags(tagPath) ? tagPath : null;
+  elements["context-tags"].classList.toggle("hidden", !contextTagPath);
+  elements["context-tags"].classList.toggle("flex", !!contextTagPath);
+  elements["context-tags"].disabled = busy;
   row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-primary");
   const menu = elements["context-menu"];
   menu.classList.remove("hidden");
@@ -1541,7 +1552,7 @@ function openContextMenu(row, onRemove, event) {
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - menu.offsetWidth - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - menu.offsetHeight - 4))}px`;
   elements["context-remove"].disabled = busy;
-  elements["context-remove"].focus();
+  (contextTagPath ? elements["context-tags"] : elements["context-remove"]).focus();
 }
 
 async function refreshSelectedPlaylistMatch() {
@@ -2822,6 +2833,19 @@ elements["generate-options"].addEventListener("click", event => {
 window.addEventListener("resize", closeGenerateOptions);
 document.addEventListener("scroll", closeGenerateOptions, true);
 renderGenerateOptions();
+elements["context-tags"].addEventListener("click", () => {
+  const path = contextTagPath;
+  hideContextMenu();
+  if (path) openTagEditor(path);
+});
+// Arrow keys move between the menu's items.
+elements["context-menu"].addEventListener("keydown", event => {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  const items = [...elements["context-menu"].querySelectorAll("button:not(.hidden):not(:disabled)")];
+  const index = items.indexOf(document.activeElement);
+  items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+});
 elements["context-remove"].addEventListener("click", () => {
   const row = contextRow;
   const remove = contextRemove;
