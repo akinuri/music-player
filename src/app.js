@@ -5,6 +5,7 @@ import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedP
 import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
 import { Visualizer } from "./visualizer.js";
+import { parseRecording, RecordingFileError, serializeRecording } from "./recording.js";
 import { initTooltips } from "./tooltips.js";
 import { currentPreference, initTheme, setPreference } from "./theme.js";
 import { createImportedPlaylist, createSavedPlaylist, generatePlaylistPaths, migrateSavedPlaylist, uniquePlaylistName, parsePlaylists, PlaylistFileError, resolvePlaylist, serializePlaylists } from "./playlists.js";
@@ -1631,9 +1632,11 @@ async function generatePlaylist() {
   if (!player.path || player.audio.paused) await playTrack(paths[0]);
 }
 
-function exportPlaylists(playlists, name) {
-  const fileName = `${name.replace(/[^\p{L}\p{N} _.-]+/gu, "").trim() || "playlist"}.json`;
-  const url = URL.createObjectURL(new Blob([serializePlaylists(playlists)], { type: "application/json" }));
+// A file name made of `name` (letters, digits, spaces and _.- only) and the extension, or `fallback` when nothing is left.
+const safeFileName = (name, fallback, extension) => `${String(name ?? "").replace(/[^\p{L}\p{N} _.-]+/gu, "").trim() || fallback}${extension}`;
+
+function downloadJson(fileName, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
@@ -1641,6 +1644,11 @@ function exportPlaylists(playlists, name) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportPlaylists(playlists, name) {
+  const fileName = safeFileName(name, "playlist", ".json");
+  downloadJson(fileName, serializePlaylists(playlists));
   notice(`Exported ${playlists.length.toLocaleString()} ${playlists.length === 1 ? "playlist" : "playlists"} to ${fileName}.`);
 }
 
@@ -2454,6 +2462,42 @@ visualizer.onTerrainError = () => {
   setVisualizerMode("2d");
 };
 for (const button of vizModeButtons) button.addEventListener("click", () => setVisualizerMode(button.dataset.vizMode));
+
+// Visualizer recordings: the 3D terrain's rows saved to a file (each marked as recorded live or filled in, with the
+// Smooth setting it was made with), and loaded back to look at.
+$("visualizer-download").addEventListener("click", () => {
+  const recording = visualizer.recording();
+  if (!recording) {
+    notice("Nothing recorded yet. Play a track with the 3D view on.", true);
+    return;
+  }
+  // A loaded recording keeps the track it was saved with.
+  let info = recording.track;
+  if (info === undefined) {
+    const track = player.path ? trackFor(player.path) : null;
+    const title = track?.title || (player.path ? relativePath(player.path).split("/").pop().replace(/\.[^.]*$/, "") : "");
+    info = player.path ? { title, artist: track?.artist || "", album: track?.album || "", file: relativePath(player.path) } : null;
+  }
+  const fileName = safeFileName(info?.title && `${info.title} - visualizer`, "visualizer recording", ".json");
+  downloadJson(fileName, serializeRecording({ ...recording, track: info }));
+  const filled = recording.rows.filter(row => row?.source === "filled").length;
+  notice(`Saved ${recording.rows.length.toLocaleString()} rows (${filled.toLocaleString()} filled in) to ${fileName}.`);
+});
+$("visualizer-load").addEventListener("click", () => $("visualizer-load-file").click());
+$("visualizer-load-file").addEventListener("change", async () => {
+  const file = $("visualizer-load-file").files[0];
+  $("visualizer-load-file").value = "";
+  if (!file) return;
+  try {
+    const recording = parseRecording(await file.text());
+    await visualizer.loadRecording(recording);
+    const name = recording.track?.title || file.name;
+    notice(`Showing the recording of ${name}. Playing records over it.`);
+  } catch (error) {
+    if (!(error instanceof RecordingFileError)) console.error("Could not load the recording:", error);
+    notice(error instanceof RecordingFileError ? error.message : "Couldn't load this recording.", true);
+  }
+});
 
 // Smoothing of the wave (both views), 0-100%, remembered per browser.
 function setVisualizerSmoothing(percent) {

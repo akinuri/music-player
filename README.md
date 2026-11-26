@@ -12,7 +12,7 @@ Requires a Chromium-based browser (File System Access API) over HTTPS or localho
 - **Playlists:** save, rename, reorder by drag and drop, remove tracks, shuffle in tracks by minutes, import/export as JSON. Total, elapsed and remaining length at a glance.
 - **Playback:** resumes where you left off after a reload; volume and speed remembered. A cut handle on the progress bar fades each track out at a set point and moves on. A gap setting waits 1–10 s between tracks, or stops after each one (∞).
 - **Lyrics:** read from the MP3's tags, or else a same-named `.lrc` or `.txt` file next to it (switchable in the Lyrics view; only the chosen format is looked for). Timed (LRC) lyrics follow along and seek on click; an offset per track shifts them when they were timed to a different recording.
-- **Visualizer:** live spectrum of the playing track as 2D bars or a rotatable 3D terrain of the recent past; shown after 30 s without input while music plays.
+- **Visualizer:** live spectrum of the playing track as 2D bars or a rotatable 3D terrain of the song so far (parts missed in a background tab or skipped by jumping ahead are filled in from the file), which can be downloaded and loaded back; shown after 30 s without input while music plays.
 - **Analysis:** timeline of your library by release year, measured in albums or tracks.
 - **Deep links:** the current view is kept in the address, so reloads and the back button work.
 

@@ -52,11 +52,17 @@ const frequencyLabel = (hz, first) => `${hz >= 1000 ? `${hz / 1000}k` : hz}${fir
 
 const timeLabel = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
+// How a row was made (see Terrain.recorded).
+const LIVE = 1;
+const FILLED = 2;
+
 export class Terrain {
   constructor(container, columns) {
     this.container = container;
     this.columns = 0;
     this.track = null;
+    // Showing a loaded recording (see load()).
+    this.loaded = false;
     this.rows = 0;
     this.step = MIN_STEP_SECONDS;
     this.rowDepth = 0;
@@ -90,6 +96,8 @@ export class Terrain {
     // Called whenever the picture changes without the music (camera moves, resizes), so a resting view draws again.
     this.onActivity = () => {};
     this.controls.addEventListener("change", () => this.onActivity());
+    // Called when rows behind the live one were skipped (a hidden tab, a jump ahead), so they can be filled.
+    this.onGap = () => {};
     // Grabbing the view stops refitting, and stops a fly-back midway.
     this.controls.addEventListener("start", () => {
       this.fitted = false;
@@ -150,6 +158,9 @@ export class Terrain {
     }
     this.columns = columns;
     this.heights = new Float32Array(columns * MAX_ROWS);
+    // How each row was made: 0 nothing yet (behind the live row, a gap), LIVE or FILLED; and the Smooth setting then.
+    this.recorded = new Uint8Array(MAX_ROWS);
+    this.rowSmoothing = new Float32Array(MAX_ROWS);
     this.bars = new InstancedMesh(this.box, this.materials.history, columns * MAX_ROWS);
     this.bars.count = 0;
     // The live row, drawn on its own at full color at the front.
@@ -426,6 +437,8 @@ export class Terrain {
     this.buildGrid(duration);
     this.layoutSheet();
     this.heights.fill(0);
+    this.recorded.fill(0);
+    this.rowSmoothing.fill(0);
     this.current = -1;
     this.bars.count = 0;
     this.liveBars.count = 0;
@@ -564,7 +577,15 @@ export class Terrain {
   // levels: one 0-1 value per band (the same values the 2D bars show). playing: paused holds everything still.
   // track/time/duration: which song and where in it. range: the analyser's [lowest, highest] frequency, which places
   // the frequency lines.
-  record(levels, { playing, track, time, duration, range }) {
+  // smoothing: the Smooth setting the levels were made with, kept per row for recordings. settled: false right after a
+  // jump or a resume, when the levels still lag behind; such a row shows live but stays a gap until filled.
+  record(levels, { playing, track, time, duration, range, smoothing = 0, settled = true }) {
+    // A loaded recording stays on screen until playback records again (as a fresh terrain).
+    if (this.loaded) {
+      if (!playing) return;
+      this.loaded = false;
+      this.track = null;
+    }
     if (range && (range[0] !== this.range[0] || range[1] !== this.range[1])) {
       this.range = range;
       if (this.rows) {
@@ -589,21 +610,97 @@ export class Terrain {
       // Seeking back clears what came after, so the live row is always the newest.
       if (row < this.current) {
         heights.fill(0, (row + 1) * columns);
+        this.recorded.fill(0, row + 1);
         for (let r = row + 1; r <= this.current; r++) this.placeRow(r);
       }
       for (let i = 0; i < columns; i++) heights[row * columns + i] = levels[i] ?? 0;
-      // Rows left behind join the history (skipped ones by seeking forward show as silence); the live row is drawn on
-      // its own at the front.
-      for (let r = Math.max(0, this.current); r < row; r++) this.placeRow(r);
-      this.placeRow(row, true);
-      this.current = row;
-      this.bars.count = row * columns;
-      this.liveBars.count = columns;
-      this.history.position.z = -row * this.rowDepth;
-      this.updateGrid(row);
-      // The sheet follows: rows around the live one change as it does (and after a seek, from where it jumped).
-      if (this.sheetStrength > 0) this.updateSheet(Math.min(previous < 0 ? 0 : previous, row), row);
+      this.recorded[row] = settled ? LIVE : 0;
+      this.rowSmoothing[row] = smoothing;
+      // Leaving a row that is still a gap (skipped, or only recorded unsettled) asks for filling.
+      const leftGap = row > previous && previous >= 0 && (row > previous + 1 || !this.recorded[previous]);
+      this.advanceTo(row);
+      if (leftGap || (previous < 0 && row > 0)) this.onGap();
     }
+  }
+
+  // Makes `row` the live one: rows left behind join the history (skipped ones by seeking forward show as silence until
+  // filled); the live row is drawn on its own at the front.
+  advanceTo(row) {
+    const previous = this.current;
+    for (let r = Math.max(0, previous); r < row; r++) this.placeRow(r);
+    this.placeRow(row, true);
+    this.current = row;
+    this.bars.count = row * this.columns;
+    this.liveBars.count = this.columns;
+    this.history.position.z = -row * this.rowDepth;
+    this.updateGrid(row);
+    // The sheet follows: rows around the live one change as it does (and after a seek, from where it jumped).
+    if (this.sheetStrength > 0) this.updateSheet(Math.min(previous < 0 ? 0 : previous, row), row);
+  }
+
+  // The song so far, up to the live row, for saving: null for a gap, else { source, smoothing, levels }.
+  recording() {
+    const { columns, heights } = this;
+    const rows = [];
+    for (let r = 0; r <= this.current; r++) {
+      rows.push(this.recorded[r] ? {
+        source: this.recorded[r] === FILLED ? "filled" : "live",
+        smoothing: this.rowSmoothing[r],
+        levels: heights.subarray(r * columns, (r + 1) * columns)
+      } : null);
+    }
+    return { duration: this.duration, step: this.step, rows };
+  }
+
+  // Shows a saved recording (see recording()) in place of the song, still, until playback records again. Its rows
+  // must match this terrain's bars; a recording longer than the terrain can hold is cut short.
+  load({ duration, rows }) {
+    this.startTrack(Symbol("loaded recording"), duration);
+    this.loaded = true;
+    const { columns, heights } = this;
+    const count = Math.min(rows.length, this.rows);
+    for (let r = 0; r < count; r++) {
+      const row = rows[r];
+      if (!row) continue;
+      for (let i = 0; i < columns; i++) heights[r * columns + i] = row.levels[i] ?? 0;
+      this.recorded[r] = row.source === "filled" ? FILLED : LIVE;
+      this.rowSmoothing[r] = row.smoothing;
+    }
+    this.advanceTo(count - 1);
+    this.onActivity();
+  }
+
+  // The rows behind the live one that hold nothing, as [first, last] runs, with what's needed to fill them. A loaded
+  // recording is shown as it was saved.
+  gaps() {
+    const runs = [];
+    if (this.loaded) return { track: this.track, step: this.step, duration: this.duration, runs };
+    for (let r = 0; r < this.current; r++) {
+      if (this.recorded[r]) continue;
+      const first = r;
+      while (r + 1 < this.current && !this.recorded[r + 1]) r++;
+      runs.push([first, r]);
+    }
+    return { track: this.track, step: this.step, duration: this.duration, runs };
+  }
+
+  // Fills gaps with [{ row, levels }]; rows that are no longer gaps (recorded meanwhile, or past the live row after a
+  // seek back) and rows of another track are left alone.
+  fillRows(track, entries, smoothing) {
+    if (track !== this.track) return;
+    const { columns, heights } = this;
+    let from = Infinity;
+    let to = -1;
+    for (const { row, levels } of entries) {
+      if (row >= this.current || this.recorded[row]) continue;
+      for (let i = 0; i < columns; i++) heights[row * columns + i] = levels[i] ?? 0;
+      this.recorded[row] = FILLED;
+      this.rowSmoothing[row] = smoothing;
+      this.placeRow(row);
+      from = Math.min(from, row);
+      to = Math.max(to, row);
+    }
+    if (to >= 0 && this.sheetStrength > 0) this.updateSheet(from, to);
   }
 
   // Draws the terrain. peaks: the 2D view's peak markers, shown as caps on the live row. Colors are [r, g, b] (0-255).

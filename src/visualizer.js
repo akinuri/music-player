@@ -1,3 +1,4 @@
+import { mixToMono, Spectrum } from "./spectrum.js";
 import { themeColor, themeRgb } from "./theme.js";
 
 const FFT_SIZE = 2048;
@@ -59,6 +60,51 @@ export function smoothLevels(levels, sigma) {
   });
 }
 
+// The analyser's smoothingTimeConstant for a smoothing strength (0-1).
+const timeSmoothing = strength => 0.75 + strength * 0.2;
+
+// Chromium's analyser reads exactly 6.02 dB (half the amplitude) below the spec's formula: measured by recording a whole
+// song live and filled in, which then differed by 6.0 dB in every band. The player needs Chromium, so filling matches it.
+const ANALYSER_GAIN = 0.5;
+// Right after a jump, a resume or a return to the tab, the bars still carry the moment before (they fall off over
+// about half a second, and the analyser averages over time). Rows recorded then show live but count as gaps, so
+// filling replaces them; filling warms up for as long before each gap, so the two agree.
+const SETTLE_MS = 500;
+
+// Filling the terrain's gaps: analysis is simulated at the live pace (about 60 frames a second), starting a little
+// before each gap so smoothing and the bars' decay have settled, as they would have while playing.
+const FILL_FPS = 60;
+const FILL_WARMUP_SECONDS = SETTLE_MS / 1000;
+// Filling works in slices of this long, then lets the page draw.
+const FILL_SLICE_MS = 8;
+// Seeking around (dragging the progress bar) makes gaps in quick succession; filling waits for it to settle.
+const FILL_DELAY_MS = 400;
+
+// Rows first..last of a song as live recording would have left them: each row keeps the bars of the last frame in its
+// slot of `step` seconds. samples: the song in mono. Yields { row, levels }.
+export function* simulateRows({ samples, sampleRate, first, last, step, duration, bands, smoothing }) {
+  const spectrum = new Spectrum(FFT_SIZE, { minDecibels: MIN_DB, maxDecibels: MAX_DB, gain: ANALYSER_GAIN });
+  const binHz = sampleRate / FFT_SIZE;
+  const edges = bandEdges(bands, binHz, sampleRate / 2);
+  const start = Math.max(0, first * step - FILL_WARMUP_SECONDS);
+  const end = Math.min(duration, (last + 1) * step);
+  let levels = new Array(bands).fill(0);
+  let row = Math.floor(start / step);
+  for (let frame = 0, time = start; time < end; time = start + ++frame / FILL_FPS) {
+    const frameRow = Math.floor(time / step);
+    if (frameRow !== row) {
+      if (row >= first && row <= last) yield { row, levels };
+      row = frameRow;
+    }
+    const bytes = spectrum.analyse(samples, Math.round(time * sampleRate), timeSmoothing(smoothing));
+    const target = smoothLevels(bandLevels(bytes, edges, binHz), smoothing * 3);
+    levels = levels.map((level, i) => Math.max(target[i], level * 0.9));
+  }
+  if (row >= first && row <= last) yield { row, levels };
+}
+
+const nextTask = () => new Promise(resolve => setTimeout(resolve));
+
 export function formatFrequency(hz) {
   if (hz >= 1000) return `${parseFloat((hz / 1000).toFixed(hz >= 10000 ? 1 : 2))} kHz`;
   return `${Math.round(hz)} Hz`;
@@ -74,6 +120,18 @@ export class Visualizer {
     this.terrain = null;
     this.terrainLoading = null;
     this.onTerrainError = () => {};
+    this.filling = false;
+    this.fillAgain = false;
+    this.fillTimer = 0;
+    this.decoded = null;
+    // Until then, rows recorded aren't trusted (see SETTLE_MS).
+    this.settleUntil = 0;
+    const unsettle = () => { this.settleUntil = performance.now() + SETTLE_MS; };
+    for (const type of ["seeking", "seeked", "play"]) audio.addEventListener(type, unsettle);
+    // A hidden tab doesn't draw, so the bars resume from wherever they were.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) unsettle(); });
+    // The decoded song is large; let it go with the track.
+    audio.addEventListener("emptied", () => { this.decoded = null; });
     this.visible = false;
     this.smoothing = 0;
     this.sheet = 0;
@@ -157,7 +215,7 @@ export class Visualizer {
   }
 
   timeSmoothing() {
-    return 0.75 + this.smoothing * 0.2;
+    return timeSmoothing(this.smoothing);
   }
 
   // How smooth the 3D history is drawn: 0 = bars, above that a sheet blended over time (0-1).
@@ -179,12 +237,101 @@ export class Visualizer {
         this.terrain = new Terrain(this.stage, BANDS);
         this.terrain.setSheet(this.sheet);
         this.terrain.onActivity = () => this.wake();
+        this.terrain.onGap = () => this.scheduleFill();
         this.wake();
       })
       .catch(error => {
         console.error("Could not load the 3D visualizer:", error);
         this.onTerrainError(error);
       });
+  }
+
+  // Fills the terrain's gaps (rows behind the live one that were never recorded) from the playing file. Runs on its own
+  // whenever a gap appears; a gap appearing while it runs makes it look once more when done.
+  scheduleFill() {
+    clearTimeout(this.fillTimer);
+    this.fillTimer = setTimeout(() => this.fill(), FILL_DELAY_MS);
+  }
+
+  async fill() {
+    clearTimeout(this.fillTimer);
+    if (this.filling) {
+      this.fillAgain = true;
+      return;
+    }
+    this.filling = true;
+    try {
+      do {
+        this.fillAgain = false;
+        await this.fillGaps();
+      } while (this.fillAgain);
+    } catch (error) {
+      console.error("Could not fill the gaps in the 3D visualizer:", error);
+    } finally {
+      this.filling = false;
+    }
+  }
+
+  async fillGaps() {
+    const { terrain } = this;
+    const gaps = terrain?.gaps();
+    if (!gaps?.runs.length) return;
+    const song = await this.decode(gaps.track);
+    if (!song) return;
+    const { smoothing } = this;
+    let sliceEnd = performance.now() + FILL_SLICE_MS;
+    for (const [first, last] of gaps.runs) {
+      let batch = [];
+      for (const entry of simulateRows({ ...song, first, last, step: gaps.step, duration: gaps.duration, bands: BANDS, smoothing })) {
+        batch.push(entry);
+        if (performance.now() < sliceEnd) continue;
+        terrain.fillRows(gaps.track, batch, smoothing);
+        batch = [];
+        this.wake();
+        await nextTask();
+        // Another track, or the terrain started over: these rows no longer apply.
+        if (terrain.track !== gaps.track) return;
+        sliceEnd = performance.now() + FILL_SLICE_MS;
+      }
+      terrain.fillRows(gaps.track, batch, smoothing);
+      this.wake();
+    }
+  }
+
+  // The 3D terrain's rows so far with the analysis settings that made them, for saving (null before 3D was shown).
+  // While a loaded recording is shown, `track` is the one it was saved with; otherwise undefined (the playing track).
+  recording() {
+    if (!this.terrain || this.terrain.current < 0) return null;
+    return {
+      ...this.terrain.recording(),
+      track: this.terrain.loaded ? this.loadedTrack : undefined,
+      analyser: { sampleRate: this.sampleRate, fftSize: FFT_SIZE, minDecibels: MIN_DB, maxDecibels: MAX_DB, bands: BANDS, fillFramesPerSecond: FILL_FPS }
+    };
+  }
+
+  // Shows a saved recording in the 3D terrain (loading 3D first if needed) until playback records again.
+  async loadRecording(recording) {
+    this.loadTerrain();
+    await this.terrainLoading;
+    if (!this.terrain) throw new Error("The 3D visualizer isn't available.");
+    if (recording.bands !== BANDS) throw new Error(`The recording has ${recording.bands} bands; the visualizer shows ${BANDS}.`);
+    clearTimeout(this.fillTimer);
+    this.loadedTrack = recording.track;
+    this.terrain.load(recording);
+    this.wake();
+  }
+
+  // The playing file decoded to mono at the analyser's sample rate, kept while the track plays. Returns null when the
+  // track changed meanwhile.
+  async decode(track) {
+    if (this.decoded?.track === track) return this.decoded;
+    this.decoded = null;
+    const data = await (await fetch(track)).arrayBuffer();
+    const buffer = await new OfflineAudioContext(1, 1, this.sampleRate).decodeAudioData(data);
+    if (this.audio.currentSrc !== track) return null;
+    const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
+    this.decoded = { track, samples: mixToMono(channels), sampleRate: buffer.sampleRate };
+    return this.decoded;
   }
 
   // One analysis per frame, whichever view is showing, so 2D and 3D always show the same moment: the same bar levels,
@@ -222,7 +369,7 @@ export class Visualizer {
   // The song position places the row; the source URL tells tracks apart. While playing, the front row is exactly the
   // 2D bars; paused, it stays on the slice it stopped at, the one the 2D ghost shows.
   recordTerrain(range) {
-    this.terrain?.record(this.levels, { playing: !this.audio.paused, track: this.audio.currentSrc || null, time: this.audio.currentTime, duration: this.audio.duration, range });
+    this.terrain?.record(this.levels, { playing: !this.audio.paused, track: this.audio.currentSrc || null, time: this.audio.currentTime, duration: this.audio.duration, range, smoothing: this.smoothing, settled: performance.now() >= this.settleUntil });
   }
 
   draw3d() {

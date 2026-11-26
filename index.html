@@ -207,6 +207,11 @@
               <label for="visualizer-sheet" title="Draw the song behind the live slice as one smooth sheet, blended over time">Sheet</label>
               <input id="visualizer-sheet" type="range" min="0" max="100" step="5" value="0" class="w-24 accent-primary">
               <span id="visualizer-sheet-value" class="w-9 tabular-nums">Off</span>
+              <span class="ml-1 flex gap-1 border-l border-bd-in pl-2">
+                <button id="visualizer-load" type="button" aria-label="Load recording" title="Load recording" class="flex h-6 w-6 items-center justify-center rounded text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-import"></use></svg></button>
+                <button id="visualizer-download" type="button" aria-label="Download recording" title="Download recording" class="flex h-6 w-6 items-center justify-center rounded text-fg-2 hover:bg-tint-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-export"></use></svg></button>
+              </span>
+              <input id="visualizer-load-file" type="file" accept=".json,application/json" class="hidden">
             </div>
             <p id="visualizer-empty" class="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 px-5 text-center text-base text-soft">Play a track to see it here.</p>
           </div>
