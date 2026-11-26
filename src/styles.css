@@ -47,9 +47,10 @@
   --c-tip: 34 52 59;
   --c-tip-text: 243 247 246;
   --c-tip-border: 34 52 59;
+  /* Spectrum bars run viz-a (quiet) to viz-b (loud) bottom to top, so a bar's color tells its level. */
   --c-viz-a: 49 94 85;
-  --c-viz-b: 124 195 166;
-  --c-viz-peak: 31 58 51;
+  --c-viz-b: 140 180 42;
+  --c-viz-peak: 94 120 14;
 }
 
 :root.dark {
@@ -94,8 +95,8 @@
   --c-tip-text: 230 238 235;
   --c-tip-border: 63 85 88;
   --c-viz-a: 63 138 118;
-  --c-viz-b: 134 212 182;
-  --c-viz-peak: 184 232 211;
+  --c-viz-b: 192 224 84;
+  --c-viz-peak: 238 252 160;
 }
 }
 
