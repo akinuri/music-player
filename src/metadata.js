@@ -12,7 +12,8 @@ function year(value) {
   return number > 0 ? number : null;
 }
 
-function readTags(file) {
+// The editable tags (title, artist, album, track number, year), or null when the file has none readable.
+export function readTags(file) {
   return new Promise(resolve => {
     jsmediatags.read(file, {
       onSuccess: ({ tags }) => resolve({ title: typeof tags.title === "string" ? tags.title.trim() : "", artist: typeof tags.artist === "string" ? tags.artist.trim() : "", album: typeof tags.album === "string" ? tags.album.trim() : "", trackNumber: trackNumber(tags.track), year: year(tags.year) }),

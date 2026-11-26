@@ -128,7 +128,7 @@
               <tbody id="group-rows"></tbody>
             </table>
             <table id="tracks-table" class="w-full min-w-[480px] table-fixed border-collapse text-base">
-              <colgroup><col class="w-14"><col class="w-20"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-20"><col class="w-24"></colgroup>
+              <colgroup><col class="w-14"><col class="w-20"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-[4.5rem]"><col class="w-28"></colgroup>
               <thead class="sticky top-0 z-10 bg-head text-soft">
                 <tr class="border-b border-bd-2">
                   <th scope="col" class="px-3 py-2 text-left">#</th>
@@ -308,6 +308,28 @@
         </div>
       </div>
     </main>
+    <dialog id="tag-editor" aria-labelledby="tag-editor-heading" class="w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-bd bg-surface p-0 text-fg shadow-lg backdrop:bg-black/40 backdrop:backdrop-blur-[1px]">
+      <form id="tag-form" class="flex flex-col gap-3 p-5">
+        <div id="tag-editor-header" class="-mx-5 -mt-5 mb-1 cursor-move touch-none select-none border-b border-bd-2 bg-head px-5 py-3">
+          <h2 id="tag-editor-heading" class="text-lg font-semibold tracking-tight">Edit tags</h2>
+          <p id="tag-file" class="truncate text-sm text-faint"></p>
+        </div>
+        <label class="flex flex-col gap-1 text-sm text-soft">Title<input id="tag-title" name="title" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+        <label class="flex flex-col gap-1 text-sm text-soft">Artist<input id="tag-artist" name="artist" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+        <label class="flex flex-col gap-1 text-sm text-soft">Album<input id="tag-album" name="album" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+        <label class="flex flex-col gap-1 text-sm text-soft">Genre<input id="tag-genre" name="genre" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+        <div class="flex gap-3">
+          <label class="flex flex-col gap-1 text-sm text-soft flex-1">Track<input id="tag-trackNumber" name="trackNumber" type="number" min="1" max="999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+          <label class="flex flex-col gap-1 text-sm text-soft flex-1">Year<input id="tag-year" name="year" type="number" min="1000" max="9999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+        </div>
+        <p id="tag-status" class="hidden text-sm"></p>
+        <div class="mt-1 flex justify-end gap-2">
+          <button id="tag-cancel" type="button" class="rounded-md border border-bd-in bg-field px-4 py-2 text-fg-2 hover:bg-tint-2">Cancel</button>
+          <button id="tag-save" type="submit" class="rounded-md border border-primary-dark bg-primary px-4 py-2 font-medium text-on-primary hover:bg-primary-dark disabled:opacity-40">Save</button>
+        </div>
+      </form>
+    </dialog>
+
     <div id="context-menu" role="menu" class="fixed z-50 hidden min-w-[9rem] rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg">
       <button id="context-remove" type="button" role="menuitem" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg>Remove from playlist</button>
     </div>

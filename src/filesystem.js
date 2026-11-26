@@ -20,14 +20,17 @@ export async function* findAudioFiles(directory, prefix = "") {
   }
 }
 
-export async function getTrackFile(directory, path) {
+export async function getTrackFileHandle(directory, path) {
   const parts = path.split("/");
   const name = parts.pop();
   for (const part of parts) {
     directory = await directory.getDirectoryHandle(part);
   }
-  const handle = await directory.getFileHandle(name);
-  return handle.getFile();
+  return directory.getFileHandle(name);
+}
+
+export async function getTrackFile(directory, path) {
+  return (await getTrackFileHandle(directory, path)).getFile();
 }
 
 // The first few top-level entries of a folder (sub-folders first), so folders with the same name

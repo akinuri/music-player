@@ -1,5 +1,6 @@
-import { findAudioFiles, findSiblingFile, getTrackFile, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
-import { readLyrics, readMetadata } from "./metadata.js";
+import { findAudioFiles, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
+import { readLyrics, readMetadata, readTags } from "./metadata.js";
+import { readGenre, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
@@ -43,6 +44,8 @@ const player = new Playback({
   onChange: renderPlayback,
   onEnded: () => finishTrack(),
   onError: error => {
+    // Saving tags rewrites the playing file; the player reloads it right after.
+    if (tagSavingPath && tagSavingPath === player.path) return;
     console.error("Playback failed:", error);
     notice("Couldn't play this file. It may be missing, unreadable, or unsupported.", true);
   }
@@ -795,16 +798,16 @@ const buttonTitles = {
   rename: "Rename playlist"
 };
 
-function button(icon, label, action, disabled = false, compact = false) {
+function button(icon, label, action, disabled = false, compact = false, title = buttonTitles[icon]) {
   const element = document.createElement("button");
   element.type = "button";
   element.setAttribute("aria-label", label);
-  element.title = buttonTitles[icon];
-  // compact: true = 32px, "small" = 28px (library rows), otherwise 40px.
-  element.className = `flex ${compact === "small" ? "h-7 w-7" : compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40`;
+  element.title = title;
+  // compact: true = 32px, "small" = 28px (library groups), "tiny" = 24px (library tracks), otherwise 40px.
+  element.className = `flex ${compact === "tiny" ? "h-6 w-6" : compact === "small" ? "h-7 w-7" : compact ? "h-8 w-8" : "h-10 w-10"} shrink-0 items-center justify-center rounded border border-bd-in bg-field text-fg-2 hover:bg-tint-2 disabled:cursor-not-allowed disabled:opacity-40`;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("class", compact === "small" ? "h-4 w-4" : "h-5 w-5");
+  svg.setAttribute("class", compact === "tiny" ? "h-3.5 w-3.5" : compact === "small" ? "h-4 w-4" : "h-5 w-5");
   const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
   use.setAttribute("href", `#icon-${icon}`);
   svg.append(use);
@@ -1220,12 +1223,13 @@ function render() {
     row.className = "border-b border-bd-3 hover:bg-field last:border-b-0";
     const added = playlistPaths().includes(track.path);
     const actions = document.createElement("div");
-    actions.className = "flex justify-end gap-1.5";
+    actions.className = "flex justify-end gap-1";
     actions.append(
       button("play", `Play from library: ${track.title} (${relativePath(track.path)})`, async () => {
         if (added || await updatePlaylist([...playlistPaths(), track.path])) await playTrack(track.path);
-      }, busy, "small"),
-      button(added ? "added" : "add", `${added ? "Added to playlist" : "Add to playlist"}: ${track.title} (${relativePath(track.path)})`, () => updatePlaylist([...playlistPaths(), track.path]), busy || added, "small")
+      }, busy, "tiny"),
+      button(added ? "added" : "add", `${added ? "Added to playlist" : "Add to playlist"}: ${track.title} (${relativePath(track.path)})`, () => updatePlaylist([...playlistPaths(), track.path]), busy || added, "tiny"),
+      button("rename", `Edit tags: ${track.title} (${relativePath(track.path)})`, () => openTagEditor(track.path), busy, "tiny", "Edit tags")
     );
     const actionCell = document.createElement("td");
     actionCell.className = "px-3 py-1";
@@ -2462,6 +2466,185 @@ visualizer.onTerrainError = () => {
   setVisualizerMode("2d");
 };
 for (const button of vizModeButtons) button.addEventListener("click", () => setVisualizerMode(button.dataset.vizMode));
+
+// A simple tag editor for library MP3s: title, artist, album, genre, track number and year, written into the file's ID3 tag
+// (other tag data such as cover art and lyrics is kept). The library entry is then updated from the saved file.
+const TAG_FIELDS = ["title", "artist", "album", "genre", "trackNumber", "year"];
+const tagEditor = $("tag-editor");
+// The track being edited and its fields as opened, so only changed ones are written.
+let tagEditing = null;
+// The track whose file is being written (the player ignores the error that can cause while it plays).
+let tagSavingPath = null;
+
+function setTagStatus(text, error = false) {
+  const status = $("tag-status");
+  status.textContent = text;
+  status.classList.toggle("hidden", !text);
+  status.classList.toggle("text-danger", error);
+  status.classList.toggle("text-soft", !error);
+}
+
+async function openTagEditor(path) {
+  const track = trackFor(path);
+  const source = sourceOf(path);
+  if (!track || !source) return;
+  if (permissionOf(source) !== "granted") {
+    notice(`Reconnect "${source.name}" before editing its tracks.`, true);
+    return;
+  }
+  // The file's own tags; the library's values stand in when they can't be read (its title may be the file name).
+  // The genre is read here directly, since numbered genres ("(17)" for Rock) need translating.
+  let tags = null;
+  let genre = "";
+  try {
+    const file = await trackFile(path);
+    tags = await readTags(file);
+    const length = tagLength(new Uint8Array(await file.slice(0, 10).arrayBuffer()));
+    if (length) genre = readGenre(new Uint8Array(await file.slice(0, length).arrayBuffer()));
+  } catch (error) {
+    console.error("Could not read the tags to edit:", error);
+  }
+  const values = { ...(tags || track), genre };
+  const original = Object.fromEntries(TAG_FIELDS.map(field => [field, values[field] === null || values[field] === undefined ? "" : String(values[field])]));
+  tagEditing = { path, original };
+  for (const field of TAG_FIELDS) $(`tag-${field}`).value = original[field];
+  $("tag-file").textContent = relativePath(path);
+  $("tag-file").title = relativePath(path);
+  setTagStatus("");
+  $("tag-save").disabled = false;
+  moveTagEditor(0, 0);
+  tagEditor.showModal();
+  focusAtEnd($("tag-title"));
+}
+
+async function saveTags() {
+  const editing = tagEditing;
+  if (!editing || tagSavingPath) return;
+  const changes = {};
+  for (const field of TAG_FIELDS) {
+    const value = $(`tag-${field}`).value.trim();
+    if (value !== editing.original[field]) changes[field] = value;
+  }
+  if (!Object.keys(changes).length) {
+    tagEditor.close();
+    return;
+  }
+  const { path } = editing;
+  const source = sourceOf(path);
+  $("tag-save").disabled = true;
+  setTagStatus("Saving…");
+  tagSavingPath = path;
+  // The playing track is reloaded from the new file, where it was.
+  const playing = player.path === path ? { time: player.audio.currentTime || 0, paused: player.audio.paused } : null;
+  try {
+    // Changing files needs more than the read access the library has; asked once per folder (this click allows it).
+    if (await source.handle.queryPermission({ mode: "readwrite" }) !== "granted" && await source.handle.requestPermission({ mode: "readwrite" }) !== "granted") {
+      throw new TagWriteError("Saving needs permission to change files in this folder.");
+    }
+    const handle = await getTrackFileHandle(source.handle, relativePath(path));
+    const bytes = writeTags(new Uint8Array(await (await handle.getFile()).arrayBuffer()), changes);
+    // The browser writes to a copy and swaps it in on close, so a failure leaves the file as it was.
+    const writable = await handle.createWritable();
+    await writable.write(bytes);
+    await writable.close();
+    const file = await handle.getFile();
+    const metadata = await readMetadata(file);
+    const track = trackFor(path);
+    const updated = {
+      ...track,
+      title: metadata.title || file.name.replace(/\.mp3$/i, ""),
+      artist: metadata.artist,
+      album: metadata.album,
+      trackNumber: metadata.trackNumber,
+      year: metadata.year,
+      duration: metadata.duration ?? track.duration,
+      size: file.size,
+      lastModified: file.lastModified
+    };
+    const next = { ...library, tracks: library.tracks.map(item => item.path === path ? updated : item) };
+    await saveLibrary(next);
+    library = next;
+    tagEditing = null;
+    tagEditor.close();
+    notice(`Saved the tags of ${relativePath(path)}.`);
+    if (playing && player.path === path) {
+      await player.play(source.handle, path, { filePath: relativePath(path), startAt: playing.time, autoplay: !playing.paused });
+    }
+  } catch (error) {
+    if (!(error instanceof TagWriteError)) console.error("Could not save the tags:", error);
+    const message = error instanceof TagWriteError ? error.message
+      : error.name === "NotAllowedError" ? "Saving needs permission to change files in this folder."
+      : "Couldn't save the tags. The file may be in use, read-only, or moved.";
+    setTagStatus(message, true);
+    $("tag-save").disabled = false;
+  } finally {
+    tagSavingPath = null;
+    render();
+  }
+}
+
+// The dialog moves by dragging its header, kept fully on screen; it opens centred again each time.
+const tagEditorOffset = { x: 0, y: 0 };
+let tagEditorDrag = null;
+
+function moveTagEditor(x, y) {
+  const bounds = tagEditor.getBoundingClientRect();
+  // Where the dialog would be unmoved, so the offset can be held within the window.
+  const left = bounds.left - tagEditorOffset.x;
+  const top = bounds.top - tagEditorOffset.y;
+  if (tagEditor.open) {
+    x = Math.min(Math.max(x, -left), window.innerWidth - bounds.width - left);
+    y = Math.min(Math.max(y, -top), window.innerHeight - bounds.height - top);
+  }
+  tagEditorOffset.x = x;
+  tagEditorOffset.y = y;
+  tagEditor.style.translate = x || y ? `${x}px ${y}px` : "";
+}
+
+$("tag-editor-header").addEventListener("pointerdown", event => {
+  if (event.button !== 0) return;
+  tagEditorDrag = { x: event.clientX - tagEditorOffset.x, y: event.clientY - tagEditorOffset.y };
+  event.currentTarget.setPointerCapture(event.pointerId);
+});
+$("tag-editor-header").addEventListener("pointermove", event => {
+  if (tagEditorDrag) moveTagEditor(event.clientX - tagEditorDrag.x, event.clientY - tagEditorDrag.y);
+});
+for (const type of ["pointerup", "pointercancel"]) {
+  $("tag-editor-header").addEventListener(type, () => { tagEditorDrag = null; });
+}
+
+// Clicking a field's label focuses it with the cursor at the end, instead of the browser's select-all.
+function focusAtEnd(input) {
+  input.focus();
+  // Number fields don't support placing the cursor.
+  if (input.type === "text") input.setSelectionRange(input.value.length, input.value.length);
+}
+for (const label of $("tag-form").querySelectorAll("label")) {
+  label.addEventListener("click", event => {
+    if (event.target.tagName === "INPUT") return;
+    event.preventDefault();
+    focusAtEnd(label.querySelector("input"));
+  });
+}
+
+$("tag-form").addEventListener("submit", event => {
+  event.preventDefault();
+  saveTags();
+});
+$("tag-cancel").addEventListener("click", () => tagEditor.close());
+// A click on the backdrop doesn't close the dialog (unsaved edits would be lost); the card pulses to say it's still
+// waiting. Backdrop clicks land on the dialog itself, outside its card.
+tagEditor.addEventListener("click", event => {
+  if (event.target !== tagEditor) return;
+  const bounds = tagEditor.getBoundingClientRect();
+  const inside = event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+  if (inside || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  tagEditor.animate([{ scale: 1 }, { scale: 1.03 }, { scale: 1 }], { duration: 240, easing: "ease-in-out" });
+});
+// Escape closes the dialog, but not halfway through saving.
+tagEditor.addEventListener("cancel", event => {
+  if (tagSavingPath) event.preventDefault();
+});
 
 // Visualizer recordings: the 3D terrain's rows saved to a file (each marked as recorded live or filled in, with the
 // Smooth setting it was made with), and loaded back to look at.
