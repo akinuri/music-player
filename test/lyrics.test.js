@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { activeLyricIndex, decodeText, parseLyrics } from "../src/lyrics.js";
+import { activeLyricIndex, decodeText, DEFAULT_LYRICS_FORMAT, formatOffset, isLyricsFile, lyricsFormat, parseLyrics, roundOffset } from "../src/lyrics.js";
 
 test("plain lyrics keep their lines, including blank stanza breaks", () => {
   assert.deepEqual(parseLyrics("One\r\nTwo\n\nThree"), {
@@ -39,4 +39,27 @@ test("decodes text files as UTF-8, UTF-16 with BOM, or Windows-1252", () => {
   assert.equal(decodeText(new Uint8Array([0xff, 0xfe, 0x48, 0x00, 0xe9, 0x00])), "Hé");
   assert.equal(decodeText(new Uint8Array([0xfe, 0xff, 0x00, 0x48, 0x00, 0xe9])), "Hé");
   assert.equal(decodeText(new Uint8Array([0x43, 0x61, 0x66, 0xe9])), "Café");
+});
+
+test("lyrics formats are looked up by id, falling back to the default for unknown or missing ids", () => {
+  assert.equal(lyricsFormat("txt").extension, ".txt");
+  assert.equal(lyricsFormat("lrc").extension, ".lrc");
+  assert.equal(lyricsFormat("nope").id, DEFAULT_LYRICS_FORMAT);
+  assert.equal(lyricsFormat(null).id, DEFAULT_LYRICS_FORMAT);
+});
+
+test("lyrics files are recognised by any format's extension, case-insensitively", () => {
+  assert.equal(isLyricsFile("05 - Clocks.lrc"), true);
+  assert.equal(isLyricsFile("05 - Clocks.TXT"), true);
+  assert.equal(isLyricsFile("05 - Clocks.txt2"), false);
+  assert.equal(isLyricsFile("playlists.json"), false);
+});
+
+test("lyrics offsets round to tenths without drift and read with a sign", () => {
+  assert.equal(roundOffset(0.1 + 0.2), 0.3);
+  assert.equal(roundOffset(-0.04), 0);
+  assert.equal(roundOffset("nope"), 0);
+  assert.equal(formatOffset(1.5), "+1.5 s");
+  assert.equal(formatOffset(-0.5), "−0.5 s");
+  assert.equal(formatOffset(0), "±0.0 s");
 });

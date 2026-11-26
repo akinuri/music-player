@@ -38,6 +38,36 @@ export function decodeText(buffer) {
   }
 }
 
+// Lyrics files next to a track share its base name. Only the chosen format is looked for (no fallback between them).
+// Adding a format is one entry here; `parse` turns the file's text into { synced, lines } like parseLyrics.
+export const LYRICS_FORMATS = [
+  { id: "lrc", extension: ".lrc", parse: parseLyrics },
+  { id: "txt", extension: ".txt", parse: parseLyrics }
+];
+export const DEFAULT_LYRICS_FORMAT = "lrc";
+
+export function lyricsFormat(id) {
+  return LYRICS_FORMATS.find(format => format.id === id) ?? LYRICS_FORMATS.find(format => format.id === DEFAULT_LYRICS_FORMAT);
+}
+
+// Whether a file name has the extension of a lyrics format.
+export function isLyricsFile(name, formats = LYRICS_FORMATS) {
+  const lower = name.toLowerCase();
+  return formats.some(format => lower.endsWith(format.extension));
+}
+
+// A lyrics offset in seconds, kept to tenths so repeated steps don't drift (0.1 + 0.2…).
+export function roundOffset(seconds) {
+  const value = Math.round((Number(seconds) || 0) * 10) / 10;
+  return Object.is(value, -0) ? 0 : value;
+}
+
+// "+1.5 s", "−0.5 s" or "±0.0 s".
+export function formatOffset(seconds) {
+  const value = roundOffset(seconds);
+  return `${value > 0 ? "+" : value < 0 ? "−" : "±"}${Math.abs(value).toFixed(1)} s`;
+}
+
 // Index of the synced line playing at `time`, or -1 before the first line.
 export function activeLyricIndex(lines, time) {
   let index = -1;

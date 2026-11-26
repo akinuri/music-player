@@ -1,6 +1,6 @@
 import { findAudioFiles, findSiblingFile, getTrackFile, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata } from "./metadata.js";
-import { activeLyricIndex, decodeText, parseLyrics } from "./lyrics.js";
+import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
 import { buildYearTimeline } from "./analysis.js";
@@ -12,7 +12,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -545,27 +545,33 @@ const lyricsCache = new Map();
 let lyricsShown = null;
 let lyricsActive = -1;
 let lyricsUserScrolledAt = 0;
+// Which lyrics file format is looked for next to tracks (see LYRICS_FORMATS).
+let lyricsFormatId = lyricsFormat(null).id;
+try { lyricsFormatId = lyricsFormat(localStorage.getItem("lyricsFormat")).id; } catch {}
 
 async function loadLyrics(path) {
-  lyricsCache.set(path, { status: "loading" });
-  let entry;
-  // Embedded lyrics win; otherwise a same-named .txt next to the MP3 is used.
-  let text = "";
+  const pending = { status: "loading" };
+  lyricsCache.set(path, pending);
+  // Embedded lyrics win; otherwise a same-named file of the chosen format next to the track is used.
+  const format = lyricsFormat(lyricsFormatId);
+  let parsed = { synced: false, lines: [] };
   let source = "Embedded";
   let failed = false;
   try {
-    text = await readLyrics(await trackFile(path));
+    parsed = parseLyrics(await readLyrics(await trackFile(path)));
   } catch (error) {
     console.error("Could not read embedded lyrics:", error);
     failed = true;
   }
-  if (!text.trim()) {
+  if (!parsed.lines.length) {
     try {
       const drop = dropped.get(path);
-      const sidecar = drop ? drop.lyricsFile || (drop.directory && await findSiblingFile(drop.directory, drop.relative, ".txt"))
-        : await findSiblingFile(sourceOf(path).handle, relativePath(path), ".txt");
+      const hasExtension = file => file.name.toLowerCase().endsWith(format.extension);
+      const sidecar = !drop ? await findSiblingFile(sourceOf(path).handle, relativePath(path), format.extension)
+        : drop.directory ? await findSiblingFile(drop.directory, drop.relative, format.extension)
+        : drop.lyricsFiles?.find(hasExtension);
       if (sidecar) {
-        text = decodeText(await sidecar.arrayBuffer());
+        parsed = format.parse(decodeText(await sidecar.arrayBuffer()));
         source = sidecar.name;
       }
     } catch (error) {
@@ -573,9 +579,9 @@ async function loadLyrics(path) {
       failed = true;
     }
   }
-  const parsed = parseLyrics(text);
-  entry = parsed.lines.length ? { status: "ready", source, ...parsed } : { status: failed ? "error" : "none" };
-  if (lyricsCache.get(path)?.status !== "loading") return;
+  const entry = parsed.lines.length ? { status: "ready", source, ...parsed } : { status: failed ? "error" : "none" };
+  // A newer load (e.g. after switching the format) replaced this one.
+  if (lyricsCache.get(path) !== pending) return;
   lyricsCache.set(path, entry);
   if (currentView === "lyrics" && player.path === path) renderLyrics();
 }
@@ -611,18 +617,66 @@ function renderLyrics() {
     elements["lyrics-lines"].scrollTop = 0;
     const message = !path ? "Play a track to see its lyrics."
       : !entry || entry.status === "loading" ? "Loading lyrics…"
-      : entry.status === "none" ? "No lyrics in this file or a matching .txt file."
+      : entry.status === "none" ? `No lyrics in this file or a matching ${lyricsFormat(lyricsFormatId).extension} file.`
       : entry.status === "error" ? "Couldn't read lyrics from this file."
       : "";
     elements["lyrics-empty"].textContent = message;
     elements["lyrics-empty"].classList.toggle("hidden", !message);
   }
   if (entry?.status === "ready" && entry.synced) highlightLyric(entry.lines);
+  renderLyricsOffset();
 }
+
+// Per-track shift of timed lyrics in seconds (positive: lines come later), for lyrics timed to another recording.
+const LYRICS_OFFSETS_KEY = "lyricsOffsets";
+let lyricsOffsets = {};
+try {
+  const stored = JSON.parse(localStorage.getItem(LYRICS_OFFSETS_KEY));
+  if (stored && typeof stored === "object" && !Array.isArray(stored)) lyricsOffsets = stored;
+} catch {}
+const lyricsOffset = path => (path && roundOffset(lyricsOffsets[path])) || 0;
+
+function setLyricsOffset(path, seconds) {
+  const value = roundOffset(seconds);
+  if (value) lyricsOffsets[path] = value;
+  else delete lyricsOffsets[path];
+  try { localStorage.setItem(LYRICS_OFFSETS_KEY, JSON.stringify(lyricsOffsets)); } catch {}
+  renderLyricsOffset();
+  const entry = lyricsCache.get(path);
+  if (player.path === path && entry?.status === "ready" && entry.synced) highlightLyric(entry.lines);
+}
+
+// The offset control shows only for timed lyrics.
+function renderLyricsOffset() {
+  const entry = player.path && lyricsCache.get(player.path);
+  const shown = entry?.status === "ready" && entry.synced;
+  elements["lyrics-offset"].classList.toggle("hidden", !shown);
+  elements["lyrics-offset"].classList.toggle("flex", shown);
+  const offset = lyricsOffset(player.path);
+  const value = elements["lyrics-offset-value"];
+  value.textContent = formatOffset(offset);
+  value.toggleAttribute("data-changed", offset !== 0);
+  value.setAttribute("aria-label", `Lyrics offset ${formatOffset(offset)}${offset ? ", reset" : ""}`);
+  value.title = offset ? "Lyrics offset for this track. Scroll to change by 0.1 s, click to reset" : "Lyrics offset for this track. Scroll to change by 0.1 s";
+}
+
+for (const [id, direction] of [["lyrics-earlier", -1], ["lyrics-later", 1]]) {
+  elements[id].addEventListener("click", event => {
+    if (player.path) setLyricsOffset(player.path, lyricsOffset(player.path) + direction * (event.shiftKey ? 0.1 : 0.5));
+  });
+}
+elements["lyrics-offset-value"].addEventListener("click", () => {
+  if (player.path) setLyricsOffset(player.path, 0);
+});
+elements["lyrics-offset-value"].addEventListener("wheel", event => {
+  if (!player.path || !event.deltaY) return;
+  event.preventDefault();
+  setLyricsOffset(player.path, lyricsOffset(player.path) + (event.deltaY < 0 ? 0.1 : -0.1));
+}, { passive: false });
 
 // Highlights the synced line being sung and keeps it centred, unless the user scrolled the lyrics recently.
 function highlightLyric(lines) {
-  const index = activeLyricIndex(lines, (player.audio.currentTime || 0) + 0.2);
+  const index = activeLyricIndex(lines, (player.audio.currentTime || 0) + 0.2 - lyricsOffset(player.path));
   if (index === lyricsActive) return;
   const rows = elements["lyrics-lines"].children;
   rows[lyricsActive]?.classList.remove("!text-deep", "font-semibold");
@@ -640,10 +694,42 @@ function highlightLyric(lines) {
 elements["lyrics-lines"].addEventListener("click", event => {
   const row = event.target.closest("[data-time]");
   if (!row || !player.path) return;
-  player.audio.currentTime = Number(row.dataset.time);
+  player.audio.currentTime = Math.max(0, Number(row.dataset.time) + lyricsOffset(player.path));
   lyricsUserScrolledAt = 0;
 });
 for (const type of ["wheel", "touchmove"]) elements["lyrics-lines"].addEventListener(type, () => { lyricsUserScrolledAt = Date.now(); }, { passive: true });
+
+// One button per lyrics format; the chosen one is the only file looked for next to tracks.
+elements["lyrics-format"].replaceChildren(...LYRICS_FORMATS.map((format, index) => {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.lyricsFormat = format.id;
+  button.textContent = format.extension;
+  button.title = `Read lyrics from ${format.extension} files next to tracks`;
+  button.className = `px-3 py-1.5${index ? " border-l border-bd-in" : ""}`;
+  return button;
+}));
+function renderLyricsFormat() {
+  for (const button of elements["lyrics-format"].children) {
+    const active = button.dataset.lyricsFormat === lyricsFormatId;
+    button.setAttribute("aria-pressed", String(active));
+    button.classList.toggle("bg-sel", active);
+    button.classList.toggle("font-semibold", active);
+    button.classList.toggle("text-deep", active);
+    button.classList.toggle("bg-field", !active);
+    button.classList.toggle("hover:bg-tint-2", !active);
+  }
+}
+elements["lyrics-format"].addEventListener("click", event => {
+  const id = event.target.closest("[data-lyrics-format]")?.dataset.lyricsFormat;
+  if (!id || id === lyricsFormatId) return;
+  lyricsFormatId = id;
+  try { localStorage.setItem("lyricsFormat", id); } catch {}
+  lyricsCache.clear();
+  renderLyricsFormat();
+  renderLyrics();
+});
+renderLyricsFormat();
 
 // Track count and duration for the whole playlist, or the part before/after the playing track (which itself is excluded).
 let playlistStats = "total";
@@ -1786,7 +1872,7 @@ function takeDrop(dataTransfer) {
   return { count: Math.max(items.length, files.length), files, handles };
 }
 
-// Music in what was dropped (folders read recursively, in natural order), .txt files that may hold lyrics, and any other files.
+// Music in what was dropped (folders read recursively, in natural order), files that may hold lyrics, and any other files.
 async function readDrop({ count, files, handles }) {
   const found = [];
   const texts = [];
@@ -1803,7 +1889,7 @@ async function readDrop({ count, files, handles }) {
     const file = handle ? await handle.getFile() : files[i];
     if (!file) continue;
     if (isAudioFile(file.name)) found.push({ file, handle, relative: file.name, label: file.name });
-    else if (/\.txt$/i.test(file.name)) texts.push(file);
+    else if (isLyricsFile(file.name)) texts.push(file);
     else others.push(file);
   }
   return { found, texts, others };
@@ -1816,8 +1902,9 @@ function registerDrop(found, texts) {
     // Unique across reloads, since direct-play playlists keep these keys.
     const key = `drop:${crypto.randomUUID().slice(0, 8)}/${item.label}`;
     const name = item.relative.split("/").pop();
-    const lyricsFile = item.file && texts.find(text => baseName(text.name) === baseName(name));
-    dropped.set(key, { ...item, lyricsFile, track: { path: key, title: name.replace(/\.[^.]*$/, ""), artist: "", album: "", trackNumber: null, year: null, duration: null } });
+    // Every format is kept, so switching the lyrics format still finds the matching one.
+    const lyricsFiles = item.file ? texts.filter(text => baseName(text.name) === baseName(name)) : [];
+    dropped.set(key, { ...item, lyricsFiles, track: { path: key, title: name.replace(/\.[^.]*$/, ""), artist: "", album: "", trackNumber: null, year: null, duration: null } });
     return key;
   });
 }

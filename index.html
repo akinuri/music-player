@@ -216,6 +216,14 @@
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
             <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+              <div id="lyrics-offset" role="group" aria-label="Lyrics timing for this track" class="hidden overflow-hidden rounded-md border border-bd-in text-sm">
+                <button id="lyrics-earlier" type="button" aria-label="Show lyrics earlier" title="Earlier by 0.5 s (With Shift: 0.1 s)" class="bg-field px-2.5 py-1.5 hover:bg-tint-2">−</button>
+                <button id="lyrics-offset-value" type="button" class="min-w-[4.5rem] border-x border-bd-in bg-field px-2 py-1.5 tabular-nums hover:bg-tint-2 data-[changed]:bg-accent-soft data-[changed]:font-semibold data-[changed]:text-deep">±0.0 s</button>
+                <button id="lyrics-later" type="button" aria-label="Show lyrics later" title="Later by 0.5 s (With Shift: 0.1 s)" class="bg-field px-2.5 py-1.5 hover:bg-tint-2">+</button>
+              </div>
+              <div id="lyrics-format" role="group" aria-label="Lyrics file format" class="flex overflow-hidden rounded-md border border-bd-in text-sm"></div>
+            </div>
           </div>
           <div id="lyrics-body" class="relative flex min-h-[260px] max-h-[70vh] flex-1 flex-col py-6 pl-4 pr-2 sm:pl-6 lg:max-h-none lg:min-h-0">
             <div id="lyrics-lines" class="-ml-2 min-h-0 flex-1 overflow-y-auto pl-2 pr-4 text-lg leading-relaxed"></div>
