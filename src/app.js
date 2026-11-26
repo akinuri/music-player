@@ -56,19 +56,35 @@ const NOTICE_DURATION = 5000;
 const ERROR_NOTICE_DURATION = NOTICE_DURATION * 10;
 let noticeTimer = 0;
 
+// Notices slide in and fade out (instantly with reduced motion).
+let noticeLeaving = null;
+const noticeMotion = () => !matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 function hideNotice() {
   clearTimeout(noticeTimer);
-  elements.notice.classList.add("hidden");
-  elements.notice.classList.remove("flex");
+  const element = elements.notice;
+  if (element.classList.contains("hidden") || noticeLeaving) return;
+  const done = () => {
+    noticeLeaving = null;
+    element.classList.add("hidden");
+    element.classList.remove("flex");
+  };
+  if (!noticeMotion()) return done();
+  noticeLeaving = element.animate([{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: "0 -6px" }], { duration: 160, easing: "ease-in" });
+  noticeLeaving.onfinish = done;
 }
 
 // Notices dismiss themselves, errors after a longer time; in-progress messages stay.
 function notice(message, error = false, warnings = [], { sticky = false } = {}) {
   clearTimeout(noticeTimer);
   const element = elements.notice;
+  // Arriving fresh slides in; replacing a notice on screen just swaps its text.
+  const arriving = element.classList.contains("hidden") || !!noticeLeaving;
+  noticeLeaving?.cancel();
+  noticeLeaving = null;
   const content = elements["notice-content"];
   content.textContent = message;
-  element.className = `relative overflow-hidden flex items-start gap-3 rounded-lg border px-4 py-3 text-base ${error ? "border-bd-danger bg-danger-soft text-danger" : "border-bd-ok bg-ok-soft text-forest"}`;
+  element.className = `fixed right-4 top-4 z-40 flex w-[min(26rem,calc(100vw-2rem))] items-start gap-3 overflow-hidden rounded-lg border px-4 py-3 text-base shadow-lg sm:right-6 lg:right-8 ${error ? "border-bd-danger bg-danger-soft text-danger" : "border-bd-ok bg-ok-soft text-forest"}`;
   const bar = elements["notice-progress"];
   bar.classList.toggle("hidden", sticky);
   if (!sticky) {
@@ -95,6 +111,7 @@ function notice(message, error = false, warnings = [], { sticky = false } = {}) 
     }
     content.append(list);
   }
+  if (arriving && noticeMotion()) element.animate([{ opacity: 0, translate: "0 -8px" }, { opacity: 1, translate: "0 0" }], { duration: 200, easing: "ease-out" });
 }
 
 function formatDuration(seconds) {

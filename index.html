@@ -51,11 +51,6 @@
       <symbol id="icon-load" viewBox="0 0 24 24"><path d="M4 5h10M4 10h10M4 15h6m4 0 3 3 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </svg>
     <main class="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-4 px-4 pb-12 pt-5 sm:px-6 lg:h-screen lg:min-h-0 lg:px-8">
-      <div id="notice" class="hidden">
-        <div id="notice-content" role="status" aria-live="polite" class="min-w-0 flex-1"></div>
-        <button id="dismiss-notice" type="button" aria-label="Dismiss notification" title="Dismiss" class="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-overlay/5"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-remove"></use></svg></button>
-        <div id="notice-progress" aria-hidden="true" class="absolute bottom-0 right-0 hidden h-[3px] w-full bg-primary/50"></div>
-      </div>
       <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <aside class="flex shrink-0 self-stretch flex-col gap-3 lg:max-h-full lg:w-[200px] lg:self-start">
           <nav data-panel class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Music navigation">
@@ -333,6 +328,12 @@
     <div id="context-menu" role="menu" class="fixed z-50 hidden min-w-[9rem] rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg">
       <button id="context-tags" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rename"></use></svg>Edit tags</button>
       <button id="context-remove" type="button" role="menuitem" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg>Remove from playlist</button>
+    </div>
+    <!-- Notices float over the top-right corner, so showing one never moves the page. -->
+    <div id="notice" class="hidden">
+      <div id="notice-content" role="status" aria-live="polite" class="min-w-0 flex-1"></div>
+      <button id="dismiss-notice" type="button" aria-label="Dismiss notification" title="Dismiss" class="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-overlay/5"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-remove"></use></svg></button>
+      <div id="notice-progress" aria-hidden="true" class="absolute bottom-0 right-0 hidden h-[3px] w-full bg-primary/50"></div>
     </div>
   </body>
 </html>
