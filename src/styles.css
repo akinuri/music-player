@@ -115,3 +115,34 @@
 .tippy-box[data-theme~="app"] > .tippy-arrow {
   color: rgb(var(--c-tip));
 }
+
+/* The picture viewer fades and scales in, and back out when closed (the dialog stays in the top layer until the
+   transition ends); its backdrop fades with it. */
+#image-viewer,
+#image-viewer::backdrop {
+  opacity: 0;
+  transition: opacity 180ms ease-out, scale 180ms ease-out, overlay 180ms allow-discrete, display 180ms allow-discrete;
+}
+#image-viewer {
+  scale: 0.96;
+}
+#image-viewer[open],
+#image-viewer[open]::backdrop {
+  opacity: 1;
+  scale: 1;
+}
+@starting-style {
+  #image-viewer[open],
+  #image-viewer[open]::backdrop {
+    opacity: 0;
+  }
+  #image-viewer[open] {
+    scale: 0.96;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #image-viewer,
+  #image-viewer::backdrop {
+    transition: none;
+  }
+}

@@ -2943,7 +2943,7 @@ function renderMediaInfo(sections) {
   $("media-info-body").replaceChildren(grid);
 }
 
-// A picture at full size, over Media info: fades and scales in; a click or Escape closes it. The picture can be moved
+// A picture at full size, over Media info: fades and scales in and out; a click or Escape closes it. The picture can be moved
 // a little by dragging, back in the middle each time it opens.
 const imageViewer = $("image-viewer");
 const viewerImage = $("image-viewer-image");
@@ -2985,10 +2985,8 @@ function openImageViewer(url, caption) {
   viewerImage.src = url;
   $("image-viewer-caption").textContent = caption;
   moveViewerImage(0, 0);
+  // Fading in and out is styles.css's (#image-viewer).
   imageViewer.showModal();
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    imageViewer.animate([{ opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1 }], { duration: 180, easing: "ease-out" });
-  }
 }
 imageViewer.addEventListener("click", () => {
   // Letting go after moving the picture isn't a click.
@@ -2998,7 +2996,6 @@ imageViewer.addEventListener("click", () => {
   }
   imageViewer.close();
 });
-imageViewer.addEventListener("close", () => viewerImage.removeAttribute("src"));
 
 $("media-info-close").addEventListener("click", () => mediaInfo.close());
 mediaInfo.addEventListener("close", () => {
