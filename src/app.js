@@ -15,7 +15,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-reload", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -1570,21 +1570,38 @@ function openContextMenu(row, onRemove, event, trackPath = null) {
   contextRemove = onRemove;
   contextTagPath = tagsPath;
   contextInfoPath = infoPath;
-  for (const [item, shown] of [[elements["context-info"], !!contextInfoPath], [elements["context-tags"], !!contextTagPath], [elements["context-remove"], !!onRemove]]) {
-    item.classList.toggle("hidden", !shown);
-    item.classList.toggle("flex", shown);
-    item.disabled = busy;
-  }
+  showContextItems({ info: !!contextInfoPath, tags: !!contextTagPath, remove: !!onRemove });
   row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-primary");
-  const menu = elements["context-menu"];
-  menu.classList.remove("hidden");
   const keyboard = event.clientX === 0 && event.clientY === 0;
   const bounds = row.getBoundingClientRect();
-  const x = keyboard ? bounds.left + 24 : event.clientX;
-  const y = keyboard ? bounds.bottom : event.clientY;
+  placeContextMenu(keyboard ? bounds.left + 24 : event.clientX, keyboard ? bounds.bottom : event.clientY);
+}
+
+// Shows the given items (the rest are hidden) and focuses the first, for the arrow keys.
+function showContextItems(shown) {
+  for (const name of ["info", "tags", "remove", "reload"]) {
+    const item = elements[`context-${name}`];
+    item.classList.toggle("hidden", !shown[name]);
+    item.classList.toggle("flex", !!shown[name]);
+    item.disabled = busy && name !== "reload";
+  }
+}
+
+// Opens the menu at a point, kept inside the window, with its first item focused.
+function placeContextMenu(x, y) {
+  const menu = elements["context-menu"];
+  menu.classList.remove("hidden");
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - menu.offsetWidth - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - menu.offsetHeight - 4))}px`;
-  (contextInfoPath ? elements["context-info"] : contextTagPath ? elements["context-tags"] : elements["context-remove"]).focus();
+  menu.querySelector("button:not(.hidden)")?.focus();
+}
+
+// Anywhere else, the menu holds what applies to the whole app.
+function openGeneralMenu(event) {
+  hideContextMenu();
+  showContextItems({ reload: true });
+  const keyboard = event.clientX === 0 && event.clientY === 0;
+  placeContextMenu(keyboard ? 24 : event.clientX, keyboard ? 24 : event.clientY);
 }
 
 async function refreshSelectedPlaylistMatch() {
@@ -3141,21 +3158,25 @@ document.addEventListener("pointerdown", event => {
   if (!event.target.closest("#context-menu")) hideContextMenu();
 });
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape" && contextRow) {
+  if (event.key === "Escape" && !elements["context-menu"].classList.contains("hidden")) {
     const row = contextRow;
     hideContextMenu();
-    row.focus();
+    row?.focus();
   }
 });
 window.addEventListener("blur", hideContextMenu);
 window.addEventListener("resize", hideContextMenu);
 document.addEventListener("scroll", hideContextMenu, true);
-// The browser's own context menu is off across the app (rows open the app's menu instead), except in text fields,
-// where it gives paste, spelling and the like.
+// The browser's own context menu is off across the app, except in text fields, where it gives paste, spelling and the
+// like. Rows open their own menu; anywhere else gets the general one (not over a dialog, which sits above any menu).
 const TEXT_FIELDS = "textarea, [contenteditable]:not([contenteditable='false']), input:is([type=text], [type=search], [type=number], [type=url], [type=email]), input:not([type])";
 document.addEventListener("contextmenu", event => {
-  if (!event.target.closest?.(TEXT_FIELDS)) event.preventDefault();
+  if (event.target.closest?.(TEXT_FIELDS)) return;
+  event.preventDefault();
+  const rowMenuOpen = !elements["context-menu"].classList.contains("hidden");
+  if (!rowMenuOpen && !event.target.closest?.("dialog")) openGeneralMenu(event);
 });
+elements["context-reload"].addEventListener("click", () => location.reload());
 elements["clear-playlist"].addEventListener("click", () => {
   const count = playlistPaths().length;
   if (window.confirm(`Clear the current playlist (${count} ${count === 1 ? "track" : "tracks"})?`)) updatePlaylist([]);
