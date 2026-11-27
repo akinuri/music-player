@@ -1,7 +1,7 @@
 import { findAudioFiles, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
 import { readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
-import { describeMedia, mediaInfoText } from "./mediainfo.js";
+import { describeMedia, formatBytes, mediaInfoText } from "./mediainfo.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
@@ -2918,13 +2918,22 @@ function renderMediaInfo(sections) {
       const figure = document.createElement("figure");
       figure.className = "col-span-2 mt-3 flex items-end gap-3";
       const image = document.createElement("img");
-      image.className = "h-28 w-28 rounded-md border border-bd object-contain";
+      image.className = "h-28 w-28 cursor-zoom-in rounded-md border border-bd object-contain";
       image.alt = picture.type;
+      image.draggable = false;
+      image.title = "View full size";
       const caption = document.createElement("figcaption");
       caption.className = "text-soft";
       caption.textContent = picture.type;
       image.addEventListener("load", () => { caption.textContent = `${picture.type} · ${image.naturalWidth} × ${image.naturalHeight}`; });
-      image.addEventListener("error", () => { caption.textContent = `${picture.type} · can't be shown`; });
+      image.addEventListener("error", () => {
+        caption.textContent = `${picture.type} · can't be shown`;
+        image.classList.remove("cursor-zoom-in");
+        image.removeAttribute("title");
+      });
+      image.addEventListener("click", () => {
+        if (image.naturalWidth) openImageViewer(url, `${picture.type} · ${image.naturalWidth} × ${image.naturalHeight} · ${formatBytes(picture.data.length)}`);
+      });
       image.src = url;
       figure.append(image, caption);
       block.append(figure);
@@ -2933,6 +2942,63 @@ function renderMediaInfo(sections) {
   }));
   $("media-info-body").replaceChildren(grid);
 }
+
+// A picture at full size, over Media info: fades and scales in; a click or Escape closes it. The picture can be moved
+// a little by dragging, back in the middle each time it opens.
+const imageViewer = $("image-viewer");
+const viewerImage = $("image-viewer-image");
+// Where the picture has been moved to, the drag in progress, and whether the last press moved it (so it isn't a click).
+const viewerOffset = { x: 0, y: 0 };
+let viewerDrag = null;
+let viewerMoved = false;
+
+function moveViewerImage(x, y) {
+  // Up to a tenth of the window each way, giving more slowly toward the edge.
+  const soften = (value, limit) => limit * Math.tanh(value / limit);
+  viewerOffset.x = x;
+  viewerOffset.y = y;
+  viewerImage.style.translate = x || y ? `${soften(x, window.innerWidth / 10)}px ${soften(y, window.innerHeight / 10)}px` : "";
+}
+
+viewerImage.addEventListener("pointerdown", event => {
+  if (event.button !== 0) return;
+  viewerDrag = { x: event.clientX - viewerOffset.x, y: event.clientY - viewerOffset.y, startX: event.clientX, startY: event.clientY };
+  viewerMoved = false;
+  viewerImage.setPointerCapture(event.pointerId);
+});
+viewerImage.addEventListener("pointermove", event => {
+  if (!viewerDrag) return;
+  if (Math.hypot(event.clientX - viewerDrag.startX, event.clientY - viewerDrag.startY) > 3) {
+    viewerMoved = true;
+    viewerImage.classList.add("cursor-grabbing");
+  }
+  if (viewerMoved) moveViewerImage(event.clientX - viewerDrag.x, event.clientY - viewerDrag.y);
+});
+for (const type of ["pointerup", "pointercancel"]) {
+  viewerImage.addEventListener(type, () => {
+    viewerDrag = null;
+    viewerImage.classList.remove("cursor-grabbing");
+  });
+}
+
+function openImageViewer(url, caption) {
+  viewerImage.src = url;
+  $("image-viewer-caption").textContent = caption;
+  moveViewerImage(0, 0);
+  imageViewer.showModal();
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    imageViewer.animate([{ opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1 }], { duration: 180, easing: "ease-out" });
+  }
+}
+imageViewer.addEventListener("click", () => {
+  // Letting go after moving the picture isn't a click.
+  if (viewerMoved) {
+    viewerMoved = false;
+    return;
+  }
+  imageViewer.close();
+});
+imageViewer.addEventListener("close", () => viewerImage.removeAttribute("src"));
 
 $("media-info-close").addEventListener("click", () => mediaInfo.close());
 mediaInfo.addEventListener("close", () => {
