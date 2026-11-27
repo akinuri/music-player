@@ -3231,13 +3231,14 @@ window.addEventListener("blur", hideContextMenu);
 window.addEventListener("resize", hideContextMenu);
 document.addEventListener("scroll", hideContextMenu, true);
 // The browser's own context menu is off across the app, except in text fields, where it gives paste, spelling and the
-// like. Rows open their own menu; anywhere else gets the general one (not over a dialog, which sits above any menu).
+// like. Rows open their own menu; anywhere else gets the general one, except over a dialog (which sits above any menu)
+// and where right-click does something itself ([data-no-context-menu], such as panning the 3D visualizer).
 const TEXT_FIELDS = "textarea, [contenteditable]:not([contenteditable='false']), input:is([type=text], [type=search], [type=number], [type=url], [type=email]), input:not([type])";
 document.addEventListener("contextmenu", event => {
   if (event.target.closest?.(TEXT_FIELDS)) return;
   event.preventDefault();
   const rowMenuOpen = !elements["context-menu"].classList.contains("hidden");
-  if (!rowMenuOpen && !event.target.closest?.("dialog")) openGeneralMenu(event);
+  if (!rowMenuOpen && !event.target.closest?.("dialog, [data-no-context-menu]")) openGeneralMenu(event);
 });
 elements["context-reload"].addEventListener("click", () => location.reload());
 elements["clear-playlist"].addEventListener("click", () => {

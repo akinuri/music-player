@@ -197,7 +197,7 @@
           </div>
           <div class="relative min-h-[260px] flex-1">
             <canvas id="visualizer-canvas" class="absolute left-2 top-2 h-[calc(100%-1rem)] w-[calc(100%-1rem)] sm:left-4 sm:w-[calc(100%-2rem)]" aria-hidden="true"></canvas>
-            <div id="visualizer-stage" class="absolute inset-0 hidden cursor-grab active:cursor-grabbing" aria-hidden="true"></div>
+            <div id="visualizer-stage" data-no-context-menu class="absolute inset-0 hidden cursor-grab active:cursor-grabbing" aria-hidden="true"></div>
             <p id="visualizer-hint" class="pointer-events-none absolute left-4 top-3 hidden text-xs text-soft sm:left-6">Drag to rotate · right-drag to pan · scroll to zoom · double-click to reset</p>
             <div id="visualizer-sheet-control" class="absolute right-4 top-2 z-10 hidden items-center gap-2 rounded-md border border-bd bg-surface/85 px-2 py-1 text-sm text-soft shadow-sm backdrop-blur-sm sm:right-6">
               <label for="visualizer-sheet" title="Draw the song behind the live slice as one smooth sheet, blended over time">Sheet</label>
