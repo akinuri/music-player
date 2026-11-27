@@ -1,13 +1,22 @@
-// Writes a few text fields into an MP3's ID3v2 tag. Only the fields given change: every other frame (cover art,
-// embedded lyrics, comments, …) is copied byte for byte, and the audio after the tag is untouched.
+// Writes text fields, lyrics and a comment into an MP3's ID3v2 tag. Only the fields given change: every other frame
+// (cover art, lyrics in other languages, players' own comments, …) is copied byte for byte, and the audio after the
+// tag is untouched.
 // Tags are kept in their version (2.3 or 2.4); a file without one gets a 2.3 tag, the most widely read.
 
 export class TagWriteError extends Error {}
 
-// Field name → frame id, per tag version. The year has its own frame in each.
+// Field name → text frame id, per tag version. The year has its own frame in each.
+const TEXT_FRAMES = { title: "TIT2", artist: "TPE1", album: "TALB", genre: "TCON", trackNumber: "TRCK", albumArtist: "TPE2", composer: "TCOM", lyricist: "TEXT", discNumber: "TPOS", copyright: "TCOP" };
 const FRAMES = {
-  3: { title: "TIT2", artist: "TPE1", album: "TALB", genre: "TCON", trackNumber: "TRCK", year: "TYER" },
-  4: { title: "TIT2", artist: "TPE1", album: "TALB", genre: "TCON", trackNumber: "TRCK", year: "TDRC" }
+  3: { ...TEXT_FRAMES, year: "TYER" },
+  4: { ...TEXT_FRAMES, year: "TDRC" }
+};
+// Fields kept in frames with a language and a description besides the text, and which of several such frames is the
+// field: the first lyrics frame; the first comment without a description (players keep their own data in described
+// comments, such as iTunes' "iTunNORM", which must stay as they are).
+const LANGUAGE_FIELDS = {
+  lyrics: { id: "USLT", isField: () => true },
+  comment: { id: "COMM", isField: content => content.description === "" }
 };
 // Year frames of either version, replaced together so a file doesn't end up with two years.
 const YEAR_FRAMES = ["TYER", "TDRC"];
@@ -146,8 +155,8 @@ function textFrame(id, text, version) {
   return frame(id, [encoding, ...encodeText(text, encoding)], version);
 }
 
-// Lyrics (an unsynchronised lyrics frame, USLT): a three-letter language, a short description and the text.
-export function lyricsFrameContent(raw) {
+// A lyrics (USLT) or comment (COMM) frame: a three-letter language, a short description and the text.
+export function languageFrameContent(raw) {
   const encoding = raw[10];
   const language = String.fromCharCode(raw[11], raw[12], raw[13]);
   const rest = raw.subarray(14);
@@ -162,31 +171,53 @@ export function lyricsFrameContent(raw) {
   };
 }
 
-function lyricsFrame({ language, description, text }, version) {
+function languageFrame(id, { language, description, text }, version) {
   const encoding = encodingFor(version, [description, text]);
   const lang = (language || "XXX").padEnd(3, " ").slice(0, 3);
-  return frame("USLT", [encoding, ...Array.from(lang, char => char.charCodeAt(0) & 0xff), ...encodeText(description, encoding), ...terminator(encoding), ...encodeText(text, encoding)], version);
+  return frame(id, [encoding, ...Array.from(lang, char => char.charCodeAt(0) & 0xff), ...encodeText(description, encoding), ...terminator(encoding), ...encodeText(text, encoding)], version);
+}
+
+// Where a language field (lyrics, comment) is among the frames, or -1.
+function languageFrameIndex(frames, field) {
+  const { id, isField } = LANGUAGE_FIELDS[field];
+  return frames.findIndex(entry => entry.id === id && isField(languageFrameContent(entry.raw)));
 }
 
 // The lyrics players show (the first lyrics frame), from the bytes of a tag or a whole file; "" without any.
 export function readLyricsText(bytes) {
-  const raw = readTagFrames(bytes)?.frames.find(entry => entry.id === "USLT")?.raw;
-  return raw ? lyricsFrameContent(raw).text : "";
+  return readFields(bytes).lyrics ?? "";
 }
 
-// changes: any of { title, artist, album, genre, trackNumber, year, lyrics }; "" or null removes the field.
-// Returns the new file.
+// Every field writeTags knows that the tag has, as text (genres as names), from the bytes of a tag or a whole file.
+export function readFields(bytes) {
+  const tag = readTagFrames(bytes);
+  if (!tag) return {};
+  const fields = {};
+  for (const [field, id] of Object.entries(FRAMES[tag.version])) {
+    const raw = tag.frames.find(entry => entry.id === id)?.raw;
+    if (raw) fields[field] = field === "genre" ? genreText(frameText(raw)) : frameText(raw);
+  }
+  for (const field of Object.keys(LANGUAGE_FIELDS)) {
+    const index = languageFrameIndex(tag.frames, field);
+    if (index >= 0) fields[field] = languageFrameContent(tag.frames[index].raw).text;
+  }
+  return fields;
+}
+
+// changes: any of the fields in FRAMES and LANGUAGE_FIELDS; "" or null removes the field. Returns the new file.
 export function writeTags(bytes, changes) {
   const existing = readTagFrames(bytes);
   const version = existing?.version ?? 3;
   let frames = existing?.frames ?? [];
-  // Lyrics replace the first lyrics frame where it stands (keeping its language and description); any others, in
-  // other languages, stay.
-  if ("lyrics" in changes) {
-    const text = changes.lyrics ?? "";
-    const index = frames.findIndex(entry => entry.id === "USLT");
-    const old = index >= 0 ? lyricsFrameContent(frames[index].raw) : null;
-    const replacement = text ? { id: "USLT", raw: lyricsFrame({ language: old?.language, description: old?.description ?? "", text }, version) } : null;
+  // Lyrics and comments replace their frame where it stands (keeping its language and description); other such
+  // frames (in other languages, or described) stay.
+  for (const field of Object.keys(LANGUAGE_FIELDS)) {
+    if (!(field in changes)) continue;
+    const text = changes[field] ?? "";
+    const index = languageFrameIndex(frames, field);
+    const old = index >= 0 ? languageFrameContent(frames[index].raw) : null;
+    const id = LANGUAGE_FIELDS[field].id;
+    const replacement = text ? { id, raw: languageFrame(id, { language: old?.language, description: old?.description ?? "", text }, version) } : null;
     if (index >= 0) frames = [...frames.slice(0, index), ...(replacement ? [replacement] : []), ...frames.slice(index + 1)];
     else if (replacement) frames = [...frames, replacement];
   }
@@ -194,7 +225,7 @@ export function writeTags(bytes, changes) {
   const replaced = new Set();
   const added = [];
   for (const [field, value] of Object.entries(changes)) {
-    if (field === "lyrics") continue;
+    if (field in LANGUAGE_FIELDS) continue;
     const id = ids[field];
     if (!id) throw new Error(`Unknown tag field: ${field}`);
     if (field === "year") YEAR_FRAMES.forEach(yearId => replaced.add(yearId));

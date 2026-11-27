@@ -1,6 +1,6 @@
 import { findAudioFiles, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
-import { readGenre, readLyricsText, tagLength, TagWriteError, writeTags } from "./id3.js";
+import { readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
@@ -2507,7 +2507,9 @@ for (const button of vizModeButtons) button.addEventListener("click", () => setV
 // A simple tag editor for library MP3s: title, artist, album, genre, track number, year and lyrics, written into the
 // file's ID3 tag (other tag data such as cover art is kept). The library entry is then updated from the saved file.
 // It also edits the lyrics files next to the track (one tab per format in LYRICS_FORMATS), which aren't tags.
-const TAG_FIELDS = ["title", "artist", "album", "genre", "trackNumber", "year", "lyrics"];
+const TAG_FIELDS = ["title", "artist", "album", "genre", "trackNumber", "year", "albumArtist", "composer", "lyricist", "copyright", "discNumber", "comment", "lyrics"];
+// Fields read straight from the tag rather than through jsmediatags (which doesn't know them, or reads them oddly).
+const TAG_OWN_FIELDS = ["genre", "albumArtist", "composer", "lyricist", "copyright", "discNumber", "comment", "lyrics"];
 const lyricsFileBox = format => $(`tag-file-${format.id}`);
 // Lyrics keep their spacing and line breaks; the other fields are trimmed.
 const tagFieldValue = field => field === "lyrics" ? $("tag-lyrics").value : $(`tag-${field}`).value.trim();
@@ -2534,25 +2536,21 @@ async function openTagEditor(path) {
     return;
   }
   // The file's own tags; the library's values stand in when they can't be read (its title may be the file name).
-  // Genre and lyrics are read here directly from the tag: numbered genres ("(17)" for Rock) need translating, and the
-  // lyrics are the very frame that saving replaces.
+  // The rest is read here directly from the tag (TAG_OWN_FIELDS): numbered genres ("(17)" for Rock) need translating,
+  // the lyrics and comment are the very frames saving replaces, and the extra fields are unknown to jsmediatags.
   let tags = null;
-  let genre = "";
-  let lyrics = "";
+  let own = {};
   try {
     const file = await trackFile(path);
     tags = await readTags(file);
     const length = tagLength(new Uint8Array(await file.slice(0, 10).arrayBuffer()));
-    if (length) {
-      const tag = new Uint8Array(await file.slice(0, length).arrayBuffer());
-      genre = readGenre(tag);
-      // The text box keeps line breaks as \n; reading them the same way means an untouched box counts as unchanged.
-      lyrics = readLyricsText(tag).replace(/\r\n?/g, "\n");
-    }
+    if (length) own = readFields(new Uint8Array(await file.slice(0, length).arrayBuffer()));
   } catch (error) {
     console.error("Could not read the tags to edit:", error);
   }
-  const values = { ...(tags || track), genre, lyrics };
+  // The text box keeps line breaks as \n; reading them the same way means an untouched box counts as unchanged.
+  if (own.lyrics) own.lyrics = own.lyrics.replace(/\r\n?/g, "\n");
+  const values = { ...(tags || track), ...Object.fromEntries(TAG_OWN_FIELDS.map(field => [field, own[field] ?? ""])) };
   const original = Object.fromEntries(TAG_FIELDS.map(field => [field, values[field] === null || values[field] === undefined ? "" : String(values[field])]));
   // The lyrics files: where each is (or would be created), its text, and whether it used Windows line breaks.
   const files = {};
@@ -2723,15 +2721,22 @@ for (const label of $("tag-form").querySelectorAll("label")) {
   });
 }
 
-// Tabs group the fields (General, Lyrics, …): each [data-tag-tab] shows the [data-tag-panel] of the same name. Hidden
-// panels stay in place (invisible), so the dialog keeps its size.
-// A tab per lyrics file format, made like the Lyrics tab, so a new format gets its own.
+// Tabs group the fields (General, Extra, Lyrics, …): each [data-tag-tab] shows the [data-tag-panel] of the same name.
+// Hidden panels stay in place (invisible), so the dialog keeps its size.
+// A field that blocks saving (a year of 99, say) may be on another tab; its tab opens so the browser can point at it.
+$("tag-form").addEventListener("invalid", event => {
+  const panel = event.target.closest("[data-tag-panel]");
+  if (panel) showTagTab(panel.dataset.tagPanel);
+}, true);
+// A tab per lyrics file format, made like the Lyrics tab and placed after it, so a new format gets its own.
+let previousTab = $("tag-tab-lyrics");
 for (const format of LYRICS_FORMATS) {
   const tab = $("tag-tab-lyrics").cloneNode();
   Object.assign(tab, { id: `tag-tab-file-${format.id}`, textContent: `${format.extension} file` });
   tab.dataset.tagTab = `file-${format.id}`;
   tab.setAttribute("aria-controls", `tag-panel-file-${format.id}`);
-  $("tag-tab-lyrics").parentElement.append(tab);
+  previousTab.after(tab);
+  previousTab = tab;
   const panel = $("tag-panel-lyrics").cloneNode(true);
   Object.assign(panel, { id: `tag-panel-file-${format.id}` });
   panel.dataset.tagPanel = `file-${format.id}`;

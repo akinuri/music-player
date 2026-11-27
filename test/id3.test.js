@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import jsmediatags from "jsmediatags/dist/jsmediatags.min.js";
-import { frameText, genreText, lyricsFrameContent, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
+import { frameText, genreText, languageFrameContent, readFields, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
 
 const ascii = text => Array.from(text, char => char.charCodeAt(0));
 const be32 = value => [(value >>> 24) & 0xff, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
@@ -116,7 +116,7 @@ test("lyrics replace the first lyrics frame in place, keeping its language; othe
   const written = writeTags(original, { lyrics });
   const frames = readTagFrames(written).frames;
   assert.deepEqual(frames.map(entry => entry.id), ["TIT2", "USLT", "APIC", "USLT"]);
-  assert.deepEqual(lyricsFrameContent(frames[1].raw), { language: "eng", description: "", text: lyrics });
+  assert.deepEqual(languageFrameContent(frames[1].raw), { language: "eng", description: "", text: lyrics });
   assert.deepEqual([...frames[3].raw], french);
   assert.equal(readLyricsText(written), lyrics);
   assert.equal(lyricsOf(await readWithJsmediatags(written)), lyrics);
@@ -126,7 +126,7 @@ test("lyrics are added when missing, in UTF-16 or UTF-8 when needed, and removed
   const lyrics = "Işıklar söner\n時計";
   for (const version of [3, 4]) {
     const written = writeTags(mp3([text("TIT2", "Saat", version)], { version }), { lyrics });
-    const content = lyricsFrameContent(readTagFrames(written).frames.find(entry => entry.id === "USLT").raw);
+    const content = languageFrameContent(readTagFrames(written).frames.find(entry => entry.id === "USLT").raw);
     assert.deepEqual(content, { language: "XXX", description: "", text: lyrics });
     assert.equal(lyricsOf(await readWithJsmediatags(written)), lyrics);
   }
@@ -139,5 +139,34 @@ test("a UTF-16 lyrics frame with a description reads back whole", () => {
   const utf16 = value => [0xff, 0xfe, ...ascii(value).flatMap(code => [code, 0])];
   const original = mp3([frame("USLT", [1, ...ascii("tur"), ...utf16("d"), 0, 0, ...utf16("x")])]);
   const written = writeTags(original, { lyrics: "Söz" });
-  assert.deepEqual(lyricsFrameContent(readTagFrames(written).frames[0].raw), { language: "tur", description: "d", text: "Söz" });
+  assert.deepEqual(languageFrameContent(readTagFrames(written).frames[0].raw), { language: "tur", description: "d", text: "Söz" });
+});
+
+test("extra text fields are read and written like the others", async () => {
+  const original = mp3([text("TIT2", "Clocks"), text("TPE2", "Coldplay"), text("TPOS", "1/1"), COVER]);
+  assert.deepEqual(readFields(original), { title: "Clocks", albumArtist: "Coldplay", discNumber: "1/1" });
+  const written = writeTags(original, { albumArtist: "Various Artists", composer: "Guy Berryman", lyricist: "Chris Martin", copyright: "2002 EMI", discNumber: "" });
+  assert.deepEqual(readFields(written), { title: "Clocks", albumArtist: "Various Artists", composer: "Guy Berryman", lyricist: "Chris Martin", copyright: "2002 EMI" });
+  assert.deepEqual([...frameOf(written, "APIC").raw], COVER);
+  const tags = await readWithJsmediatags(written);
+  assert.equal(tags.TPE2.data, "Various Artists");
+  assert.equal(tags.TCOM.data, "Guy Berryman");
+  assert.equal(tags.TEXT.data, "Chris Martin");
+});
+
+test("the comment is the undescribed one; players' described comments stay as they are", () => {
+  const itunes = frame("COMM", [0, ...ascii("eng"), ...ascii("iTunNORM"), 0, ...ascii(" 00000A1B 00000C2D")]);
+  const plain = frame("COMM", [0, ...ascii("eng"), 0, ...ascii("Ripped from CD")]);
+  const original = mp3([itunes, text("TIT2", "Clocks"), plain]);
+  assert.equal(readFields(original).comment, "Ripped from CD");
+  const written = writeTags(original, { comment: "Best version" });
+  const frames = readTagFrames(written).frames;
+  assert.deepEqual([...frames[0].raw], itunes);
+  assert.deepEqual(languageFrameContent(frames[2].raw), { language: "eng", description: "", text: "Best version" });
+  // Only a described comment: a new plain one is added, the described one stays.
+  const added = writeTags(mp3([itunes]), { comment: "Note" });
+  assert.deepEqual(readTagFrames(added).frames.map(entry => entry.id), ["COMM", "COMM"]);
+  assert.deepEqual([...readTagFrames(added).frames[0].raw], itunes);
+  assert.equal(readFields(added).comment, "Note");
+  assert.equal(readFields(writeTags(original, { comment: "" })).comment, undefined);
 });

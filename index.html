@@ -312,21 +312,34 @@
           </div>
           <!-- One tab per panel below (data-tag-tab = data-tag-panel); more tags can get their own. -->
           <div role="tablist" aria-label="Tag groups" class="-mb-3 mt-3 flex gap-1">
-            <button id="tag-tab-general" type="button" role="tab" data-tag-tab="general" aria-controls="tag-panel-general" class="-mb-px rounded-t-md border border-b-0 px-4 py-1.5 text-sm font-medium transition-colors">General</button>
-            <button id="tag-tab-lyrics" type="button" role="tab" data-tag-tab="lyrics" aria-controls="tag-panel-lyrics" class="-mb-px rounded-t-md border border-b-0 px-4 py-1.5 text-sm font-medium transition-colors">Lyrics</button>
+            <button id="tag-tab-general" type="button" role="tab" data-tag-tab="general" aria-controls="tag-panel-general" class="-mb-px rounded-t-md border border-b-0 px-3 py-1.5 text-sm font-medium transition-colors">General</button>
+            <button id="tag-tab-lyrics" type="button" role="tab" data-tag-tab="lyrics" aria-controls="tag-panel-lyrics" class="-mb-px rounded-t-md border border-b-0 px-3 py-1.5 text-sm font-medium transition-colors">Lyrics</button>
+            <button id="tag-tab-extra" type="button" role="tab" data-tag-tab="extra" aria-controls="tag-panel-extra" class="-mb-px rounded-t-md border border-b-0 px-3 py-1.5 text-sm font-medium transition-colors">Extra</button>
           </div>
         </div>
         <!-- The panels share one grid cell, so the dialog keeps its size whichever tab is open. -->
-        <div class="grid">
+        <div class="grid grid-cols-[minmax(0,1fr)]">
           <div id="tag-panel-general" role="tabpanel" data-tag-panel="general" aria-labelledby="tag-tab-general" class="flex flex-col gap-3 [grid-area:1/1]">
             <label class="flex flex-col gap-1 text-sm text-soft">Title<input id="tag-title" name="title" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
             <label class="flex flex-col gap-1 text-sm text-soft">Artist<input id="tag-artist" name="artist" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
             <label class="flex flex-col gap-1 text-sm text-soft">Album<input id="tag-album" name="album" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
             <label class="flex flex-col gap-1 text-sm text-soft">Genre<input id="tag-genre" name="genre" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
             <div class="flex gap-3">
-              <label class="flex flex-col gap-1 text-sm text-soft flex-1">Track<input id="tag-trackNumber" name="trackNumber" type="number" min="1" max="999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
-              <label class="flex flex-col gap-1 text-sm text-soft flex-1">Year<input id="tag-year" name="year" type="number" min="1000" max="9999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+              <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft">Track<input id="tag-trackNumber" name="trackNumber" type="number" min="1" max="999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+              <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft">Year<input id="tag-year" name="year" type="number" min="1000" max="9999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
             </div>
+          </div>
+          <div id="tag-panel-extra" role="tabpanel" data-tag-panel="extra" aria-labelledby="tag-tab-extra" class="flex flex-col gap-3 [grid-area:1/1]">
+            <label class="flex flex-col gap-1 text-sm text-soft">Album artist<input id="tag-albumArtist" name="albumArtist" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+            <div class="flex gap-3">
+              <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft">Composer<input id="tag-composer" name="composer" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+              <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft">Lyricist<input id="tag-lyricist" name="lyricist" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+            </div>
+            <div class="flex gap-3">
+              <label class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft">Copyright<input id="tag-copyright" name="copyright" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+              <label class="flex w-24 shrink-0 flex-col gap-1 text-sm text-soft">Disc<input id="tag-discNumber" name="discNumber" type="text" maxlength="9" placeholder="1/2" pattern="\d{1,3}(/\d{1,3})?" title="Number, or number/count" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
+            </div>
+            <label class="flex flex-col gap-1 text-sm text-soft">Comment<input id="tag-comment" name="comment" type="text" maxlength="1000" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></label>
           </div>
           <div id="tag-panel-lyrics" role="tabpanel" data-tag-panel="lyrics" aria-labelledby="tag-tab-lyrics" class="flex flex-col [grid-area:1/1]">
             <textarea id="tag-lyrics" name="lyrics" aria-label="Lyrics" spellcheck="false" class="min-h-[12rem] flex-1 resize-none rounded-md border border-bd-in bg-field px-3 py-2 text-sm leading-relaxed text-fg outline-none focus:border-primary"></textarea>
