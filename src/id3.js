@@ -106,7 +106,7 @@ export function readTagFrames(bytes) {
 }
 
 // Text in one of ID3's four encodings: 0 Latin-1, 1 UTF-16 with a byte-order mark, 2 UTF-16 big-endian, 3 UTF-8.
-function decodeText(data, encoding) {
+export function decodeText(data, encoding) {
   if (encoding === 0) return Array.from(data, byte => String.fromCharCode(byte)).join("");
   if (encoding === 3) return new TextDecoder("utf-8").decode(data);
   if (encoding === 2) return new TextDecoder("utf-16be").decode(data);
@@ -135,7 +135,7 @@ function encodeText(text, encoding) {
 }
 
 // What ends a string inside a frame: one zero byte, or two in UTF-16.
-const terminator = encoding => encoding === 1 || encoding === 2 ? [0, 0] : [0];
+export const terminator = encoding => encoding === 1 || encoding === 2 ? [0, 0] : [0];
 
 function frame(id, body, version) {
   const bytes = new Uint8Array(10 + body.length);

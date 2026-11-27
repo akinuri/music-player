@@ -1,6 +1,7 @@
 import { findAudioFiles, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
 import { readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
+import { describeMedia, mediaInfoText } from "./mediainfo.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
@@ -14,7 +15,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-tags", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -1475,6 +1476,8 @@ let contextRow = null;
 let contextRemove = null;
 // The library track the menu's "Edit tags" opens (null when the row's track can't be edited).
 let contextTagPath = null;
+// The track the menu's "Media info" opens (null when its file can't be reached: not in the library, nor dropped).
+let contextInfoPath = null;
 
 const GENERATE_PRESETS = [5, 10, 15, 20, 25, 30, 45, 60];
 
@@ -1550,21 +1553,24 @@ function hideContextMenu() {
   contextRow = null;
   contextRemove = null;
   contextTagPath = null;
+  contextInfoPath = null;
 }
 
 // Only library MP3s can have their tags edited (not dropped music, nor tracks missing from the library).
 const canEditTags = path => !!path && !isDropped(path) && !!library?.tracks.some(track => track.path === path);
 
-// The menu shows the items that apply: "Edit tags" for a library track (tagPath), "Remove from playlist" when the row
-// is in one (onRemove). Without either, there is nothing to show.
-function openContextMenu(row, onRemove, event, tagPath = null) {
+// The menu shows the items that apply: "Media info" for a track whose file can be reached and "Edit tags" for a library
+// track (trackPath), "Remove from playlist" when the row is in one (onRemove). Without any, there is nothing to show.
+function openContextMenu(row, onRemove, event, trackPath = null) {
   hideContextMenu();
-  const tagsPath = canEditTags(tagPath) ? tagPath : null;
-  if (!tagsPath && !onRemove) return;
+  const infoPath = trackPath && trackFor(trackPath) ? trackPath : null;
+  const tagsPath = canEditTags(trackPath) ? trackPath : null;
+  if (!infoPath && !tagsPath && !onRemove) return;
   contextRow = row;
   contextRemove = onRemove;
   contextTagPath = tagsPath;
-  for (const [item, shown] of [[elements["context-tags"], !!contextTagPath], [elements["context-remove"], !!onRemove]]) {
+  contextInfoPath = infoPath;
+  for (const [item, shown] of [[elements["context-info"], !!contextInfoPath], [elements["context-tags"], !!contextTagPath], [elements["context-remove"], !!onRemove]]) {
     item.classList.toggle("hidden", !shown);
     item.classList.toggle("flex", shown);
     item.disabled = busy;
@@ -1578,7 +1584,7 @@ function openContextMenu(row, onRemove, event, tagPath = null) {
   const y = keyboard ? bounds.bottom : event.clientY;
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - menu.offsetWidth - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - menu.offsetHeight - 4))}px`;
-  (contextTagPath ? elements["context-tags"] : elements["context-remove"]).focus();
+  (contextInfoPath ? elements["context-info"] : contextTagPath ? elements["context-tags"] : elements["context-remove"]).focus();
 }
 
 async function refreshSelectedPlaylistMatch() {
@@ -2504,6 +2510,58 @@ visualizer.onTerrainError = () => {
 };
 for (const button of vizModeButtons) button.addEventListener("click", () => setVisualizerMode(button.dataset.vizMode));
 
+// Behaviour shared by the app's dialogs. They move by dragging `handle`, kept fully on screen, and open above the middle
+// (half the space above them, as centred, taken away), back in place each time. A click on the backdrop closes them,
+// or, for dialogs that would lose edits (keepOpen), makes the card pulse to say it's still waiting. Backdrop clicks land
+// on the dialog itself, outside its card. Returns a function that opens the dialog.
+function setUpDialog(dialog, handle, { keepOpen = false } = {}) {
+  const offset = { x: 0, y: 0 };
+  let drag = null;
+  const move = (x, y) => {
+    const bounds = dialog.getBoundingClientRect();
+    // Where the dialog would be unmoved, so the offset can be held within the window.
+    const left = bounds.left - offset.x;
+    const top = bounds.top - offset.y;
+    if (dialog.open) {
+      x = Math.min(Math.max(x, -left), window.innerWidth - bounds.width - left);
+      y = Math.min(Math.max(y, -top), window.innerHeight - bounds.height - top);
+    }
+    offset.x = x;
+    offset.y = y;
+    dialog.style.translate = x || y ? `${x}px ${y}px` : "";
+  };
+  // Until it's dragged, the dialog keeps its place above the middle as its size changes (content that arrives after
+  // opening, a status line): the shift is always taken from where it is centred now.
+  let placed = false;
+  const place = () => move(0, -(dialog.getBoundingClientRect().top - offset.y) / 2);
+  new ResizeObserver(() => {
+    if (dialog.open && placed) place();
+  }).observe(dialog);
+  handle.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || event.target.closest("button")) return;
+    placed = false;
+    drag = { x: event.clientX - offset.x, y: event.clientY - offset.y };
+    handle.setPointerCapture(event.pointerId);
+  });
+  handle.addEventListener("pointermove", event => {
+    if (drag) move(event.clientX - drag.x, event.clientY - drag.y);
+  });
+  for (const type of ["pointerup", "pointercancel"]) handle.addEventListener(type, () => { drag = null; });
+  dialog.addEventListener("click", event => {
+    if (event.target !== dialog) return;
+    const bounds = dialog.getBoundingClientRect();
+    if (event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom) return;
+    if (!keepOpen) dialog.close();
+    else if (!matchMedia("(prefers-reduced-motion: reduce)").matches) dialog.animate([{ scale: 1 }, { scale: 1.03 }, { scale: 1 }], { duration: 240, easing: "ease-in-out" });
+  });
+  return () => {
+    move(0, 0);
+    dialog.showModal();
+    placed = true;
+    place();
+  };
+}
+
 // A simple tag editor for library MP3s: title, artist, album, genre, track number, year and lyrics, written into the
 // file's ID3 tag (other tag data such as cover art is kept). The library entry is then updated from the saved file.
 // It also edits the lyrics files next to the track (one tab per format in LYRICS_FORMATS), which aren't tags.
@@ -2576,10 +2634,7 @@ async function openTagEditor(path) {
   setTagStatus("");
   $("tag-save").disabled = false;
   showTagTab("general");
-  moveTagEditor(0, 0);
-  tagEditor.showModal();
-  // Opens above the middle: half the space above it, as centred, is taken away.
-  moveTagEditor(0, -tagEditor.getBoundingClientRect().top / 2);
+  showTagEditor();
   focusAtEnd($("tag-title"));
 }
 
@@ -2677,35 +2732,8 @@ async function saveTags() {
   }
 }
 
-// The dialog moves by dragging the top of its header (title and file), kept fully on screen; it opens centred again each time.
-const tagEditorOffset = { x: 0, y: 0 };
-let tagEditorDrag = null;
-
-function moveTagEditor(x, y) {
-  const bounds = tagEditor.getBoundingClientRect();
-  // Where the dialog would be unmoved, so the offset can be held within the window.
-  const left = bounds.left - tagEditorOffset.x;
-  const top = bounds.top - tagEditorOffset.y;
-  if (tagEditor.open) {
-    x = Math.min(Math.max(x, -left), window.innerWidth - bounds.width - left);
-    y = Math.min(Math.max(y, -top), window.innerHeight - bounds.height - top);
-  }
-  tagEditorOffset.x = x;
-  tagEditorOffset.y = y;
-  tagEditor.style.translate = x || y ? `${x}px ${y}px` : "";
-}
-
-$("tag-editor-handle").addEventListener("pointerdown", event => {
-  if (event.button !== 0) return;
-  tagEditorDrag = { x: event.clientX - tagEditorOffset.x, y: event.clientY - tagEditorOffset.y };
-  event.currentTarget.setPointerCapture(event.pointerId);
-});
-$("tag-editor-handle").addEventListener("pointermove", event => {
-  if (tagEditorDrag) moveTagEditor(event.clientX - tagEditorDrag.x, event.clientY - tagEditorDrag.y);
-});
-for (const type of ["pointerup", "pointercancel"]) {
-  $("tag-editor-handle").addEventListener(type, () => { tagEditorDrag = null; });
-}
+// The editor moves by dragging the top of its header (title and file); a backdrop click would lose edits, so it pulses.
+const showTagEditor = setUpDialog(tagEditor, $("tag-editor-handle"), { keepOpen: true });
 
 // Clicking a field's label focuses it with the cursor at the end, instead of the browser's select-all.
 function focusAtEnd(input) {
@@ -2784,18 +2812,128 @@ $("tag-form").addEventListener("submit", event => {
   saveTags();
 });
 $("tag-cancel").addEventListener("click", () => tagEditor.close());
-// A click on the backdrop doesn't close the dialog (unsaved edits would be lost); the card pulses to say it's still
-// waiting. Backdrop clicks land on the dialog itself, outside its card.
-tagEditor.addEventListener("click", event => {
-  if (event.target !== tagEditor) return;
-  const bounds = tagEditor.getBoundingClientRect();
-  const inside = event.clientX >= bounds.left && event.clientX <= bounds.right && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
-  if (inside || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  tagEditor.animate([{ scale: 1 }, { scale: 1.03 }, { scale: 1 }], { duration: 240, easing: "ease-in-out" });
-});
 // Escape closes the dialog, but not halfway through saving.
 tagEditor.addEventListener("cancel", event => {
   if (tagSavingPath) event.preventDefault();
+});
+
+// Media info: everything readable about a track's file (see mediainfo.js), from the row's context menu.
+const mediaInfo = $("media-info");
+const showMediaInfo = setUpDialog(mediaInfo, $("media-info-handle"));
+let mediaInfoSections = null;
+// Pictures are shown from object URLs, let go when the dialog closes.
+let mediaInfoUrls = [];
+
+async function openMediaInfo(path) {
+  let file;
+  let location;
+  try {
+    const drop = dropped.get(path);
+    if (drop) {
+      file = await droppedFile(drop, { ask: true });
+      location = drop.label;
+    } else {
+      const source = sourceOf(path);
+      if (!source) return;
+      if (permissionOf(source) !== "granted") {
+        notice(`Reconnect "${source.name}" to see its tracks' details.`, true);
+        return;
+      }
+      file = await trackFile(path);
+      location = `${source.name}/${relativePath(path)}`;
+    }
+  } catch (error) {
+    console.error("Could not open the file for its details:", error);
+    notice("Couldn't read this file. It may have been moved, removed, or access wasn't granted.", true);
+    return;
+  }
+  mediaInfoSections = null;
+  $("media-info-file").textContent = file.name;
+  $("media-info-file").title = location;
+  $("media-info-copy").disabled = true;
+  const reading = document.createElement("p");
+  reading.className = "text-soft";
+  reading.textContent = "Reading the file…";
+  $("media-info-body").replaceChildren(reading);
+  showMediaInfo();
+  try {
+    // MP3s are read whole: every frame is walked for exact length and bit rates. Other formats get file details only.
+    const mp3 = /\.mp3$/i.test(file.name) || file.type === "audio/mpeg";
+    const bytes = mp3 ? new Uint8Array(await file.arrayBuffer()) : null;
+    mediaInfoSections = describeMedia({ name: file.name, size: file.size, type: file.type, lastModified: file.lastModified, path: location }, bytes);
+  } catch (error) {
+    console.error("Could not read the file's details:", error);
+    reading.textContent = "Couldn't read this file.";
+    return;
+  }
+  if (!mediaInfo.open) return;
+  renderMediaInfo(mediaInfoSections);
+  $("media-info-copy").disabled = false;
+}
+
+function renderMediaInfo(sections) {
+  // One grid for every section (each a subgrid of it), so the values line up in one column throughout.
+  const grid = document.createElement("div");
+  grid.className = "grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4";
+  grid.append(...sections.map(section => {
+    const block = document.createElement("section");
+    block.className = "col-span-2 mt-5 grid grid-cols-subgrid first:mt-0";
+    // A bar across the dialog that stays at the top while its section scrolls by (the body's top padding is -top-4).
+    const title = document.createElement("h3");
+    title.className = "sticky -top-4 z-10 col-span-2 -mx-5 mb-2 border-y border-bd-2 bg-head px-5 py-1.5 text-sm font-semibold text-deep";
+    title.textContent = section.title;
+    const list = document.createElement("dl");
+    list.className = "col-span-2 grid grid-cols-subgrid gap-y-1";
+    for (const [label, value] of section.rows) {
+      const term = document.createElement("dt");
+      // Field names in pure black (white in the dark theme, where black wouldn't show).
+      term.className = "text-black dark:text-white";
+      term.textContent = label;
+      const detail = document.createElement("dd");
+      detail.className = "whitespace-pre-wrap break-words text-fg-2/85";
+      detail.textContent = value;
+      list.append(term, detail);
+    }
+    block.append(title, list);
+    for (const picture of section.pictures ?? []) {
+      const url = URL.createObjectURL(new Blob([picture.data], { type: picture.mime }));
+      mediaInfoUrls.push(url);
+      const figure = document.createElement("figure");
+      figure.className = "col-span-2 mt-3 flex items-end gap-3";
+      const image = document.createElement("img");
+      image.className = "h-28 w-28 rounded-md border border-bd object-contain";
+      image.alt = picture.type;
+      const caption = document.createElement("figcaption");
+      caption.className = "text-soft";
+      caption.textContent = picture.type;
+      image.addEventListener("load", () => { caption.textContent = `${picture.type} · ${image.naturalWidth} × ${image.naturalHeight}`; });
+      image.addEventListener("error", () => { caption.textContent = `${picture.type} · can't be shown`; });
+      image.src = url;
+      figure.append(image, caption);
+      block.append(figure);
+    }
+    return block;
+  }));
+  $("media-info-body").replaceChildren(grid);
+}
+
+$("media-info-close").addEventListener("click", () => mediaInfo.close());
+mediaInfo.addEventListener("close", () => {
+  for (const url of mediaInfoUrls) URL.revokeObjectURL(url);
+  mediaInfoUrls = [];
+});
+// The details as plain text, like MediaInfo's text view; the button says when it's done.
+$("media-info-copy").addEventListener("click", async () => {
+  if (!mediaInfoSections) return;
+  const button = $("media-info-copy");
+  try {
+    await navigator.clipboard.writeText(mediaInfoText(mediaInfoSections));
+    button.textContent = "Copied";
+  } catch (error) {
+    console.error("Could not copy the details:", error);
+    button.textContent = "Couldn't copy";
+  }
+  setTimeout(() => { button.textContent = "Copy"; }, 1500);
 });
 
 // Visualizer recordings: the 3D terrain's rows saved to a file (each marked as recorded live or filled in, with the
@@ -2974,6 +3112,11 @@ elements["generate-options"].addEventListener("click", event => {
 window.addEventListener("resize", closeGenerateOptions);
 document.addEventListener("scroll", closeGenerateOptions, true);
 renderGenerateOptions();
+elements["context-info"].addEventListener("click", () => {
+  const path = contextInfoPath;
+  hideContextMenu();
+  if (path) openMediaInfo(path);
+});
 elements["context-tags"].addEventListener("click", () => {
   const path = contextTagPath;
   hideContextMenu();
