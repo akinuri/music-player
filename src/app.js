@@ -2551,6 +2551,8 @@ async function openTagEditor(path) {
   $("tag-save").disabled = false;
   moveTagEditor(0, 0);
   tagEditor.showModal();
+  // Opens above the middle: half the space above it, as centred, is taken away.
+  moveTagEditor(0, -tagEditor.getBoundingClientRect().top / 2);
   focusAtEnd($("tag-title"));
 }
 
