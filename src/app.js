@@ -1,4 +1,4 @@
-import { findAudioFiles, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
+import { findAudioFiles, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
 import { readGenre, readLyricsText, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
@@ -2504,9 +2504,11 @@ visualizer.onTerrainError = () => {
 };
 for (const button of vizModeButtons) button.addEventListener("click", () => setVisualizerMode(button.dataset.vizMode));
 
-// A simple tag editor for library MP3s: title, artist, album, genre, track number, year and lyrics, written into the file's ID3 tag
-// (other tag data such as cover art and lyrics is kept). The library entry is then updated from the saved file.
+// A simple tag editor for library MP3s: title, artist, album, genre, track number, year and lyrics, written into the
+// file's ID3 tag (other tag data such as cover art is kept). The library entry is then updated from the saved file.
+// It also edits the lyrics files next to the track (one tab per format in LYRICS_FORMATS), which aren't tags.
 const TAG_FIELDS = ["title", "artist", "album", "genre", "trackNumber", "year", "lyrics"];
+const lyricsFileBox = format => $(`tag-file-${format.id}`);
 // Lyrics keep their spacing and line breaks; the other fields are trimmed.
 const tagFieldValue = field => field === "lyrics" ? $("tag-lyrics").value : $(`tag-${field}`).value.trim();
 const tagEditor = $("tag-editor");
@@ -2552,7 +2554,24 @@ async function openTagEditor(path) {
   }
   const values = { ...(tags || track), genre, lyrics };
   const original = Object.fromEntries(TAG_FIELDS.map(field => [field, values[field] === null || values[field] === undefined ? "" : String(values[field])]));
-  tagEditing = { path, original };
+  // The lyrics files: where each is (or would be created), its text, and whether it used Windows line breaks.
+  const files = {};
+  for (const format of LYRICS_FORMATS) {
+    let entry = null;
+    try {
+      const found = await findSibling(source.handle, relativePath(path), format.extension);
+      const raw = found.handle ? decodeText(await (await found.handle.getFile()).arrayBuffer()) : "";
+      entry = { ...found, text: raw.replace(/\r\n?/g, "\n"), crlf: raw.includes("\r\n") };
+    } catch (error) {
+      console.error(`Could not read the ${format.extension} file:`, error);
+    }
+    files[format.id] = entry;
+    const box = lyricsFileBox(format);
+    box.value = entry?.text ?? "";
+    box.disabled = !entry;
+    box.placeholder = !entry ? `Couldn't read the ${format.extension} file.` : entry.handle ? "" : `No ${entry.name} yet. Saving creates it.`;
+  }
+  tagEditing = { path, original, files };
   for (const field of TAG_FIELDS) $(`tag-${field}`).value = original[field];
   $("tag-file").textContent = relativePath(path);
   $("tag-file").title = relativePath(path);
@@ -2574,7 +2593,9 @@ async function saveTags() {
     const value = tagFieldValue(field);
     if (value !== editing.original[field]) changes[field] = value;
   }
-  if (!Object.keys(changes).length) {
+  const fileChanges = LYRICS_FORMATS.filter(format => editing.files[format.id] && lyricsFileBox(format).value !== editing.files[format.id].text);
+  const tagsChanged = Object.keys(changes).length > 0;
+  if (!tagsChanged && !fileChanges.length) {
     tagEditor.close();
     return;
   }
@@ -2584,11 +2605,35 @@ async function saveTags() {
   setTagStatus("Saving…");
   tagSavingPath = path;
   // The playing track is reloaded from the new file, where it was.
-  const playing = player.path === path ? { time: player.audio.currentTime || 0, paused: player.audio.paused } : null;
+  const playing = tagsChanged && player.path === path ? { time: player.audio.currentTime || 0, paused: player.audio.paused } : null;
   try {
     // Changing files needs more than the read access the library has; asked once per folder (this click allows it).
     if (await source.handle.queryPermission({ mode: "readwrite" }) !== "granted" && await source.handle.requestPermission({ mode: "readwrite" }) !== "granted") {
       throw new TagWriteError("Saving needs permission to change files in this folder.");
+    }
+    // Lyrics files first: they're small, and the track's tags may then be saved knowing they went through.
+    for (const format of fileChanges) {
+      const entry = editing.files[format.id];
+      const text = lyricsFileBox(format).value;
+      if (!text) {
+        // Emptied: the file goes (there's nothing to keep an empty file for).
+        if (entry.handle) await entry.directory.removeEntry(entry.name);
+        Object.assign(entry, { handle: null, text: "" });
+        continue;
+      }
+      const handle = entry.handle ?? await entry.directory.getFileHandle(entry.name, { create: true });
+      const writable = await handle.createWritable();
+      // Saved as UTF-8, with the line breaks the file had.
+      await writable.write(entry.crlf ? text.replace(/\n/g, "\r\n") : text);
+      await writable.close();
+      Object.assign(entry, { handle, text });
+    }
+    lyricsCache.delete(path);
+    if (!tagsChanged) {
+      tagEditing = null;
+      tagEditor.close();
+      notice(`Saved ${fileChanges.map(format => editing.files[format.id].name).join(" and ")}.`);
+      return;
     }
     const handle = await getTrackFileHandle(source.handle, relativePath(path));
     const bytes = writeTags(new Uint8Array(await (await handle.getFile()).arrayBuffer()), changes);
@@ -2617,7 +2662,7 @@ async function saveTags() {
     lyricsCache.delete(path);
     tagEditing = null;
     tagEditor.close();
-    notice(`Saved the tags of ${relativePath(path)}.`);
+    notice(`Saved the tags of ${relativePath(path)}${fileChanges.length ? ` and ${fileChanges.map(format => editing.files[format.id].name).join(" and ")}` : ""}.`);
     if (playing && player.path === path) {
       await player.play(source.handle, path, { filePath: relativePath(path), startAt: playing.time, autoplay: !playing.paused });
     }
@@ -2625,7 +2670,7 @@ async function saveTags() {
     if (!(error instanceof TagWriteError)) console.error("Could not save the tags:", error);
     const message = error instanceof TagWriteError ? error.message
       : error.name === "NotAllowedError" ? "Saving needs permission to change files in this folder."
-      : "Couldn't save the tags. The file may be in use, read-only, or moved.";
+      : "Couldn't save. The files may be in use, read-only, or moved.";
     setTagStatus(message, true);
     $("tag-save").disabled = false;
   } finally {
@@ -2680,6 +2725,22 @@ for (const label of $("tag-form").querySelectorAll("label")) {
 
 // Tabs group the fields (General, Lyrics, …): each [data-tag-tab] shows the [data-tag-panel] of the same name. Hidden
 // panels stay in place (invisible), so the dialog keeps its size.
+// A tab per lyrics file format, made like the Lyrics tab, so a new format gets its own.
+for (const format of LYRICS_FORMATS) {
+  const tab = $("tag-tab-lyrics").cloneNode();
+  Object.assign(tab, { id: `tag-tab-file-${format.id}`, textContent: `${format.extension} file` });
+  tab.dataset.tagTab = `file-${format.id}`;
+  tab.setAttribute("aria-controls", `tag-panel-file-${format.id}`);
+  $("tag-tab-lyrics").parentElement.append(tab);
+  const panel = $("tag-panel-lyrics").cloneNode(true);
+  Object.assign(panel, { id: `tag-panel-file-${format.id}` });
+  panel.dataset.tagPanel = `file-${format.id}`;
+  panel.setAttribute("aria-labelledby", tab.id);
+  const box = panel.querySelector("textarea");
+  Object.assign(box, { id: `tag-file-${format.id}`, name: `file-${format.id}`, value: "" });
+  box.setAttribute("aria-label", `${format.extension} file`);
+  $("tag-panel-lyrics").parentElement.append(panel);
+}
 const tagTabs = [...tagEditor.querySelectorAll("[data-tag-tab]")];
 function showTagTab(name) {
   for (const tab of tagTabs) {

@@ -49,16 +49,24 @@ export async function listContents(directory, limit = 3) {
 
 // The file next to `path` with the same base name and the given extension (case-insensitive), or null.
 export async function findSiblingFile(directory, path, extension) {
+  const { handle } = await findSibling(directory, path, extension);
+  return handle ? handle.getFile() : null;
+}
+
+// The same, for writing: the folder it's in, its name (as found, or as it would be created) and its handle (null when
+// there is no such file yet).
+export async function findSibling(directory, path, extension) {
   const parts = path.split("/");
   const name = parts.pop();
   for (const part of parts) {
     directory = await directory.getDirectoryHandle(part);
   }
-  const wanted = `${name.replace(/\.[^.]*$/, "")}${extension}`.toLowerCase();
+  const base = `${name.replace(/\.[^.]*$/, "")}${extension}`;
+  const wanted = base.toLowerCase();
   for await (const [entry, handle] of directory.entries()) {
-    if (handle.kind === "file" && entry.toLowerCase() === wanted) return handle.getFile();
+    if (handle.kind === "file" && entry.toLowerCase() === wanted) return { directory, name: entry, handle };
   }
-  return null;
+  return { directory, name: base, handle: null };
 }
 
 export async function scanLibrary(directory, readMetadata, onProgress = () => {}) {
