@@ -2687,10 +2687,13 @@ function showTagTab(name) {
     const selected = tab.dataset.tagTab === name;
     tab.setAttribute("aria-selected", String(selected));
     tab.tabIndex = selected ? 0 : -1;
-    tab.classList.toggle("border-primary", selected);
+    // The open tab takes the body's color and joins it below the header's edge, like a folder tab.
+    tab.classList.toggle("border-bd-2", selected);
+    tab.classList.toggle("bg-surface", selected);
     tab.classList.toggle("text-deep", selected);
     tab.classList.toggle("border-transparent", !selected);
     tab.classList.toggle("text-soft", !selected);
+    tab.classList.toggle("hover:bg-tint", !selected);
     tab.classList.toggle("hover:text-fg-2", !selected);
   }
   for (const panel of tagEditor.querySelectorAll("[data-tag-panel]")) panel.classList.toggle("invisible", panel.dataset.tagPanel !== name);
