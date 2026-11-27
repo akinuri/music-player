@@ -2634,7 +2634,7 @@ async function saveTags() {
   }
 }
 
-// The dialog moves by dragging its header, kept fully on screen; it opens centred again each time.
+// The dialog moves by dragging the top of its header (title and file), kept fully on screen; it opens centred again each time.
 const tagEditorOffset = { x: 0, y: 0 };
 let tagEditorDrag = null;
 
@@ -2652,17 +2652,16 @@ function moveTagEditor(x, y) {
   tagEditor.style.translate = x || y ? `${x}px ${y}px` : "";
 }
 
-$("tag-editor-header").addEventListener("pointerdown", event => {
-  // Tabs sit in the header; they're clicked, not dragged by.
-  if (event.button !== 0 || event.target.closest("button")) return;
+$("tag-editor-handle").addEventListener("pointerdown", event => {
+  if (event.button !== 0) return;
   tagEditorDrag = { x: event.clientX - tagEditorOffset.x, y: event.clientY - tagEditorOffset.y };
   event.currentTarget.setPointerCapture(event.pointerId);
 });
-$("tag-editor-header").addEventListener("pointermove", event => {
+$("tag-editor-handle").addEventListener("pointermove", event => {
   if (tagEditorDrag) moveTagEditor(event.clientX - tagEditorDrag.x, event.clientY - tagEditorDrag.y);
 });
 for (const type of ["pointerup", "pointercancel"]) {
-  $("tag-editor-header").addEventListener(type, () => { tagEditorDrag = null; });
+  $("tag-editor-handle").addEventListener(type, () => { tagEditorDrag = null; });
 }
 
 // Clicking a field's label focuses it with the cursor at the end, instead of the browser's select-all.
