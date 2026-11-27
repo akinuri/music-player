@@ -1,6 +1,6 @@
 import { findAudioFiles, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
-import { readGenre, tagLength, TagWriteError, writeTags } from "./id3.js";
+import { readGenre, readLyricsText, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
@@ -2504,9 +2504,11 @@ visualizer.onTerrainError = () => {
 };
 for (const button of vizModeButtons) button.addEventListener("click", () => setVisualizerMode(button.dataset.vizMode));
 
-// A simple tag editor for library MP3s: title, artist, album, genre, track number and year, written into the file's ID3 tag
+// A simple tag editor for library MP3s: title, artist, album, genre, track number, year and lyrics, written into the file's ID3 tag
 // (other tag data such as cover art and lyrics is kept). The library entry is then updated from the saved file.
-const TAG_FIELDS = ["title", "artist", "album", "genre", "trackNumber", "year"];
+const TAG_FIELDS = ["title", "artist", "album", "genre", "trackNumber", "year", "lyrics"];
+// Lyrics keep their spacing and line breaks; the other fields are trimmed.
+const tagFieldValue = field => field === "lyrics" ? $("tag-lyrics").value : $(`tag-${field}`).value.trim();
 const tagEditor = $("tag-editor");
 // The track being edited and its fields as opened, so only changed ones are written.
 let tagEditing = null;
@@ -2530,18 +2532,25 @@ async function openTagEditor(path) {
     return;
   }
   // The file's own tags; the library's values stand in when they can't be read (its title may be the file name).
-  // The genre is read here directly, since numbered genres ("(17)" for Rock) need translating.
+  // Genre and lyrics are read here directly from the tag: numbered genres ("(17)" for Rock) need translating, and the
+  // lyrics are the very frame that saving replaces.
   let tags = null;
   let genre = "";
+  let lyrics = "";
   try {
     const file = await trackFile(path);
     tags = await readTags(file);
     const length = tagLength(new Uint8Array(await file.slice(0, 10).arrayBuffer()));
-    if (length) genre = readGenre(new Uint8Array(await file.slice(0, length).arrayBuffer()));
+    if (length) {
+      const tag = new Uint8Array(await file.slice(0, length).arrayBuffer());
+      genre = readGenre(tag);
+      // The text box keeps line breaks as \n; reading them the same way means an untouched box counts as unchanged.
+      lyrics = readLyricsText(tag).replace(/\r\n?/g, "\n");
+    }
   } catch (error) {
     console.error("Could not read the tags to edit:", error);
   }
-  const values = { ...(tags || track), genre };
+  const values = { ...(tags || track), genre, lyrics };
   const original = Object.fromEntries(TAG_FIELDS.map(field => [field, values[field] === null || values[field] === undefined ? "" : String(values[field])]));
   tagEditing = { path, original };
   for (const field of TAG_FIELDS) $(`tag-${field}`).value = original[field];
@@ -2549,6 +2558,7 @@ async function openTagEditor(path) {
   $("tag-file").title = relativePath(path);
   setTagStatus("");
   $("tag-save").disabled = false;
+  showTagTab("general");
   moveTagEditor(0, 0);
   tagEditor.showModal();
   // Opens above the middle: half the space above it, as centred, is taken away.
@@ -2561,7 +2571,7 @@ async function saveTags() {
   if (!editing || tagSavingPath) return;
   const changes = {};
   for (const field of TAG_FIELDS) {
-    const value = $(`tag-${field}`).value.trim();
+    const value = tagFieldValue(field);
     if (value !== editing.original[field]) changes[field] = value;
   }
   if (!Object.keys(changes).length) {
@@ -2603,6 +2613,8 @@ async function saveTags() {
     const next = { ...library, tracks: library.tracks.map(item => item.path === path ? updated : item) };
     await saveLibrary(next);
     library = next;
+    // Embedded lyrics win in the Lyrics view; read them again.
+    lyricsCache.delete(path);
     tagEditing = null;
     tagEditor.close();
     notice(`Saved the tags of ${relativePath(path)}.`);
@@ -2641,7 +2653,8 @@ function moveTagEditor(x, y) {
 }
 
 $("tag-editor-header").addEventListener("pointerdown", event => {
-  if (event.button !== 0) return;
+  // Tabs sit in the header; they're clicked, not dragged by.
+  if (event.button !== 0 || event.target.closest("button")) return;
   tagEditorDrag = { x: event.clientX - tagEditorOffset.x, y: event.clientY - tagEditorOffset.y };
   event.currentTarget.setPointerCapture(event.pointerId);
 });
@@ -2656,13 +2669,45 @@ for (const type of ["pointerup", "pointercancel"]) {
 function focusAtEnd(input) {
   input.focus();
   // Number fields don't support placing the cursor.
-  if (input.type === "text") input.setSelectionRange(input.value.length, input.value.length);
+  if (input.type === "text" || input.type === "textarea") input.setSelectionRange(input.value.length, input.value.length);
 }
 for (const label of $("tag-form").querySelectorAll("label")) {
   label.addEventListener("click", event => {
-    if (event.target.tagName === "INPUT") return;
+    if (event.target.matches("input, textarea")) return;
     event.preventDefault();
-    focusAtEnd(label.querySelector("input"));
+    focusAtEnd(label.querySelector("input, textarea"));
+  });
+}
+
+// Tabs group the fields (General, Lyrics, …): each [data-tag-tab] shows the [data-tag-panel] of the same name. Hidden
+// panels stay in place (invisible), so the dialog keeps its size.
+const tagTabs = [...tagEditor.querySelectorAll("[data-tag-tab]")];
+function showTagTab(name) {
+  for (const tab of tagTabs) {
+    const selected = tab.dataset.tagTab === name;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    tab.classList.toggle("border-primary", selected);
+    tab.classList.toggle("text-deep", selected);
+    tab.classList.toggle("border-transparent", !selected);
+    tab.classList.toggle("text-soft", !selected);
+    tab.classList.toggle("hover:text-fg-2", !selected);
+  }
+  for (const panel of tagEditor.querySelectorAll("[data-tag-panel]")) panel.classList.toggle("invisible", panel.dataset.tagPanel !== name);
+}
+for (const tab of tagTabs) {
+  tab.addEventListener("click", () => {
+    showTagTab(tab.dataset.tagTab);
+    const field = tagEditor.querySelector(`[data-tag-panel="${tab.dataset.tagTab}"]`).querySelector("input, textarea");
+    if (field) focusAtEnd(field);
+  });
+  // Arrow keys move between tabs.
+  tab.addEventListener("keydown", event => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next = tagTabs[(tagTabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : -1) + tagTabs.length) % tagTabs.length];
+    showTagTab(next.dataset.tagTab);
+    next.focus();
   });
 }
 

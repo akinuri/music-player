@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import jsmediatags from "jsmediatags/dist/jsmediatags.min.js";
-import { frameText, genreText, readGenre, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
+import { frameText, genreText, lyricsFrameContent, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
 
 const ascii = text => Array.from(text, char => char.charCodeAt(0));
 const be32 = value => [(value >>> 24) & 0xff, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
@@ -105,4 +105,39 @@ test("the genre is read from just the tag, and written as a name", () => {
   const written = writeTags(original, { genre: "Alternative Rock" });
   assert.equal(readGenre(written), "Alternative Rock");
   assert.deepEqual([...frameOf(written, "APIC").raw], COVER);
+});
+
+const lyricsOf = tags => typeof tags.lyrics === "string" ? tags.lyrics : tags.lyrics?.lyrics;
+
+test("lyrics replace the first lyrics frame in place, keeping its language; others stay", async () => {
+  const french = frame("USLT", [0, ...ascii("fra"), ...ascii("fr"), 0, ...ascii("Les lumieres")]);
+  const original = mp3([text("TIT2", "Clocks"), LYRICS, COVER, french]);
+  const lyrics = "[00:29.78] The lights go out\n[00:33.70] Tides";
+  const written = writeTags(original, { lyrics });
+  const frames = readTagFrames(written).frames;
+  assert.deepEqual(frames.map(entry => entry.id), ["TIT2", "USLT", "APIC", "USLT"]);
+  assert.deepEqual(lyricsFrameContent(frames[1].raw), { language: "eng", description: "", text: lyrics });
+  assert.deepEqual([...frames[3].raw], french);
+  assert.equal(readLyricsText(written), lyrics);
+  assert.equal(lyricsOf(await readWithJsmediatags(written)), lyrics);
+});
+
+test("lyrics are added when missing, in UTF-16 or UTF-8 when needed, and removed when emptied", async () => {
+  const lyrics = "Işıklar söner\n時計";
+  for (const version of [3, 4]) {
+    const written = writeTags(mp3([text("TIT2", "Saat", version)], { version }), { lyrics });
+    const content = lyricsFrameContent(readTagFrames(written).frames.find(entry => entry.id === "USLT").raw);
+    assert.deepEqual(content, { language: "XXX", description: "", text: lyrics });
+    assert.equal(lyricsOf(await readWithJsmediatags(written)), lyrics);
+  }
+  const removed = writeTags(mp3([text("TIT2", "Clocks"), LYRICS]), { lyrics: "" });
+  assert.deepEqual(readTagFrames(removed).frames.map(entry => entry.id), ["TIT2"]);
+  assert.equal(readLyricsText(removed), "");
+});
+
+test("a UTF-16 lyrics frame with a description reads back whole", () => {
+  const utf16 = value => [0xff, 0xfe, ...ascii(value).flatMap(code => [code, 0])];
+  const original = mp3([frame("USLT", [1, ...ascii("tur"), ...utf16("d"), 0, 0, ...utf16("x")])]);
+  const written = writeTags(original, { lyrics: "Söz" });
+  assert.deepEqual(lyricsFrameContent(readTagFrames(written).frames[0].raw), { language: "tur", description: "d", text: "Söz" });
 });

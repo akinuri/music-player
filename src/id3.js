@@ -96,59 +96,105 @@ export function readTagFrames(bytes) {
   return { version, frames, audioStart };
 }
 
-// The text of a text frame (any of the four encodings), without terminators.
+// Text in one of ID3's four encodings: 0 Latin-1, 1 UTF-16 with a byte-order mark, 2 UTF-16 big-endian, 3 UTF-8.
+function decodeText(data, encoding) {
+  if (encoding === 0) return Array.from(data, byte => String.fromCharCode(byte)).join("");
+  if (encoding === 3) return new TextDecoder("utf-8").decode(data);
+  if (encoding === 2) return new TextDecoder("utf-16be").decode(data);
+  // The byte-order mark says which end comes first (little-endian without one).
+  if (data[0] === 0xfe && data[1] === 0xff) return new TextDecoder("utf-16be").decode(data.subarray(2));
+  return new TextDecoder("utf-16le").decode(data[0] === 0xff && data[1] === 0xfe ? data.subarray(2) : data);
+}
+
+// The encoding to write texts in: UTF-8 in 2.4 tags; in 2.3, Latin-1 when it can hold them, else UTF-16.
+const encodingFor = (version, texts) => version === 4 ? 3 : texts.every(text => /^[\x00-\xff]*$/.test(text)) ? 0 : 1;
+
+function encodeText(text, encoding) {
+  if (encoding === 3) return new TextEncoder().encode(text);
+  if (encoding === 0) return Uint8Array.from(text, char => char.charCodeAt(0));
+  if (!text) return new Uint8Array(0);
+  // UTF-16 with a byte-order mark, little-endian.
+  const bytes = new Uint8Array(2 + text.length * 2);
+  bytes[0] = 0xff;
+  bytes[1] = 0xfe;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    bytes[2 + i * 2] = code & 0xff;
+    bytes[3 + i * 2] = code >> 8;
+  }
+  return bytes;
+}
+
+// What ends a string inside a frame: one zero byte, or two in UTF-16.
+const terminator = encoding => encoding === 1 || encoding === 2 ? [0, 0] : [0];
+
+function frame(id, body, version) {
+  const bytes = new Uint8Array(10 + body.length);
+  bytes.set(Array.from(id, char => char.charCodeAt(0)), 0);
+  bytes.set(version === 4 ? toSynchsafe(body.length) : toPlain(body.length), 4);
+  bytes.set(body, 10);
+  return bytes;
+}
+
+// The text of a text frame, without terminators.
 export function frameText(raw) {
-  const data = raw.subarray(11);
-  const encoding = raw[10];
-  let text;
-  if (encoding === 0) text = Array.from(data, byte => String.fromCharCode(byte)).join("");
-  else if (encoding === 3) text = new TextDecoder("utf-8").decode(data);
-  else if (encoding === 2) text = new TextDecoder("utf-16be").decode(data);
-  // UTF-16 with a byte-order mark, which says which end comes first (little-endian without one).
-  else if (data[0] === 0xfe && data[1] === 0xff) text = new TextDecoder("utf-16be").decode(data.subarray(2));
-  else text = new TextDecoder("utf-16le").decode(data[0] === 0xff && data[1] === 0xfe ? data.subarray(2) : data);
-  return text.replace(/\0+$/, "");
+  return decodeText(raw.subarray(11), raw[10]).replace(/\0+$/, "");
 }
 
 function textFrame(id, text, version) {
-  let encoding;
-  let body;
-  if (version === 4) {
-    encoding = 3;
-    body = new TextEncoder().encode(text);
-  } else if (/^[\x00-\xff]*$/.test(text)) {
-    encoding = 0;
-    body = Uint8Array.from(text, char => char.charCodeAt(0));
-  } else {
-    // UTF-16 with a byte-order mark, little-endian.
-    encoding = 1;
-    body = new Uint8Array(2 + text.length * 2);
-    body[0] = 0xff;
-    body[1] = 0xfe;
-    for (let i = 0; i < text.length; i++) {
-      const code = text.charCodeAt(i);
-      body[2 + i * 2] = code & 0xff;
-      body[3 + i * 2] = code >> 8;
-    }
-  }
-  const size = body.length + 1;
-  const frame = new Uint8Array(10 + size);
-  frame.set(Array.from(id, char => char.charCodeAt(0)), 0);
-  frame.set(version === 4 ? toSynchsafe(size) : toPlain(size), 4);
-  frame[10] = encoding;
-  frame.set(body, 11);
-  return frame;
+  const encoding = encodingFor(version, [text]);
+  return frame(id, [encoding, ...encodeText(text, encoding)], version);
 }
 
-// changes: any of { title, artist, album, genre, trackNumber, year }; "" or null removes the field. Returns the new file.
+// Lyrics (an unsynchronised lyrics frame, USLT): a three-letter language, a short description and the text.
+export function lyricsFrameContent(raw) {
+  const encoding = raw[10];
+  const language = String.fromCharCode(raw[11], raw[12], raw[13]);
+  const rest = raw.subarray(14);
+  // The description ends at the first terminator (in UTF-16, a zero pair on a character boundary).
+  const width = terminator(encoding).length;
+  let end = 0;
+  while (end + width <= rest.length && !(rest[end] === 0 && (width === 1 || rest[end + 1] === 0))) end += width;
+  return {
+    language,
+    description: decodeText(rest.subarray(0, end), encoding),
+    text: decodeText(rest.subarray(Math.min(rest.length, end + width)), encoding).replace(/\0+$/, "")
+  };
+}
+
+function lyricsFrame({ language, description, text }, version) {
+  const encoding = encodingFor(version, [description, text]);
+  const lang = (language || "XXX").padEnd(3, " ").slice(0, 3);
+  return frame("USLT", [encoding, ...Array.from(lang, char => char.charCodeAt(0) & 0xff), ...encodeText(description, encoding), ...terminator(encoding), ...encodeText(text, encoding)], version);
+}
+
+// The lyrics players show (the first lyrics frame), from the bytes of a tag or a whole file; "" without any.
+export function readLyricsText(bytes) {
+  const raw = readTagFrames(bytes)?.frames.find(entry => entry.id === "USLT")?.raw;
+  return raw ? lyricsFrameContent(raw).text : "";
+}
+
+// changes: any of { title, artist, album, genre, trackNumber, year, lyrics }; "" or null removes the field.
+// Returns the new file.
 export function writeTags(bytes, changes) {
   const existing = readTagFrames(bytes);
   const version = existing?.version ?? 3;
-  const frames = existing?.frames ?? [];
+  let frames = existing?.frames ?? [];
+  // Lyrics replace the first lyrics frame where it stands (keeping its language and description); any others, in
+  // other languages, stay.
+  if ("lyrics" in changes) {
+    const text = changes.lyrics ?? "";
+    const index = frames.findIndex(entry => entry.id === "USLT");
+    const old = index >= 0 ? lyricsFrameContent(frames[index].raw) : null;
+    const replacement = text ? { id: "USLT", raw: lyricsFrame({ language: old?.language, description: old?.description ?? "", text }, version) } : null;
+    if (index >= 0) frames = [...frames.slice(0, index), ...(replacement ? [replacement] : []), ...frames.slice(index + 1)];
+    else if (replacement) frames = [...frames, replacement];
+  }
   const ids = FRAMES[version];
   const replaced = new Set();
   const added = [];
   for (const [field, value] of Object.entries(changes)) {
+    if (field === "lyrics") continue;
     const id = ids[field];
     if (!id) throw new Error(`Unknown tag field: ${field}`);
     if (field === "year") YEAR_FRAMES.forEach(yearId => replaced.add(yearId));
