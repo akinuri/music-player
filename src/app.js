@@ -1245,9 +1245,13 @@ function render() {
       button("play", `Play from library: ${track.title} (${relativePath(track.path)})`, async () => {
         if (added || await updatePlaylist([...playlistPaths(), track.path])) await playTrack(track.path);
       }, busy, "tiny"),
-      button(added ? "added" : "add", `${added ? "Added to playlist" : "Add to playlist"}: ${track.title} (${relativePath(track.path)})`, () => updatePlaylist([...playlistPaths(), track.path]), busy || added, "tiny"),
-      button("rename", `Edit tags: ${track.title} (${relativePath(track.path)})`, () => openTagEditor(track.path), busy, "tiny", "Edit tags")
+      button(added ? "added" : "add", `${added ? "Added to playlist" : "Add to playlist"}: ${track.title} (${relativePath(track.path)})`, () => updatePlaylist([...playlistPaths(), track.path]), busy || added, "tiny")
     );
+    // Tag editing is rare, so it lives in the row's context menu rather than among the buttons.
+    row.addEventListener("contextmenu", event => {
+      event.preventDefault();
+      openContextMenu(row, null, event, track.path);
+    });
     const actionCell = document.createElement("td");
     actionCell.className = "px-3 py-1";
     actionCell.append(actions);
@@ -1551,14 +1555,20 @@ function hideContextMenu() {
 // Only library MP3s can have their tags edited (not dropped music, nor tracks missing from the library).
 const canEditTags = path => !!path && !isDropped(path) && !!library?.tracks.some(track => track.path === path);
 
+// The menu shows the items that apply: "Edit tags" for a library track (tagPath), "Remove from playlist" when the row
+// is in one (onRemove). Without either, there is nothing to show.
 function openContextMenu(row, onRemove, event, tagPath = null) {
   hideContextMenu();
+  const tagsPath = canEditTags(tagPath) ? tagPath : null;
+  if (!tagsPath && !onRemove) return;
   contextRow = row;
   contextRemove = onRemove;
-  contextTagPath = canEditTags(tagPath) ? tagPath : null;
-  elements["context-tags"].classList.toggle("hidden", !contextTagPath);
-  elements["context-tags"].classList.toggle("flex", !!contextTagPath);
-  elements["context-tags"].disabled = busy;
+  contextTagPath = tagsPath;
+  for (const [item, shown] of [[elements["context-tags"], !!contextTagPath], [elements["context-remove"], !!onRemove]]) {
+    item.classList.toggle("hidden", !shown);
+    item.classList.toggle("flex", shown);
+    item.disabled = busy;
+  }
   row.classList.add("outline", "outline-2", "-outline-offset-2", "outline-primary");
   const menu = elements["context-menu"];
   menu.classList.remove("hidden");
@@ -1568,7 +1578,6 @@ function openContextMenu(row, onRemove, event, tagPath = null) {
   const y = keyboard ? bounds.bottom : event.clientY;
   menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - menu.offsetWidth - 4))}px`;
   menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - menu.offsetHeight - 4))}px`;
-  elements["context-remove"].disabled = busy;
   (contextTagPath ? elements["context-tags"] : elements["context-remove"]).focus();
 }
 
