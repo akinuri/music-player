@@ -2713,11 +2713,11 @@ function focusAtEnd(input) {
   // Number fields don't support placing the cursor.
   if (input.type === "text" || input.type === "textarea") input.setSelectionRange(input.value.length, input.value.length);
 }
-for (const label of $("tag-form").querySelectorAll("label")) {
+// Labels sit beside their fields and fit their text, so only the words themselves are clickable.
+for (const label of $("tag-form").querySelectorAll("label[for]")) {
   label.addEventListener("click", event => {
-    if (event.target.matches("input, textarea")) return;
     event.preventDefault();
-    focusAtEnd(label.querySelector("input, textarea"));
+    focusAtEnd(label.control);
   });
 }
 
