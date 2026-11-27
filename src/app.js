@@ -2883,8 +2883,11 @@ document.addEventListener("keydown", event => {
 window.addEventListener("blur", hideContextMenu);
 window.addEventListener("resize", hideContextMenu);
 document.addEventListener("scroll", hideContextMenu, true);
-elements.playlist.addEventListener("contextmenu", event => {
-  if (!event.target.closest("[data-path]")) event.preventDefault();
+// The browser's own context menu is off across the app (rows open the app's menu instead), except in text fields,
+// where it gives paste, spelling and the like.
+const TEXT_FIELDS = "textarea, [contenteditable]:not([contenteditable='false']), input:is([type=text], [type=search], [type=number], [type=url], [type=email]), input:not([type])";
+document.addEventListener("contextmenu", event => {
+  if (!event.target.closest?.(TEXT_FIELDS)) event.preventDefault();
 });
 elements["clear-playlist"].addEventListener("click", () => {
   const count = playlistPaths().length;
