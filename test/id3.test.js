@@ -174,10 +174,43 @@ test("the comment is the undescribed one; players' described comments stay as th
 test("the cover is the front-cover picture, else the first one", () => {
   const picture = (type, bytes) => frame("APIC", [0, ...ascii("image/jpeg"), 0, type, 0, ...bytes]);
   const both = mp3([picture(4, [1, 1]), text("TIT2", "Clocks"), picture(3, [3, 3, 3])]);
-  assert.deepEqual(readCover(both), { mime: "image/jpeg", data: Uint8Array.of(3, 3, 3) });
+  assert.deepEqual(readCover(both), { mime: "image/jpeg", data: Uint8Array.of(3, 3, 3), type: 3 });
   assert.deepEqual([...readCover(mp3([picture(0, [7])])).data], [7]);
   assert.equal(readCover(mp3([text("TIT2", "Clocks")])), null);
   assert.equal(readCover(Uint8Array.from(AUDIO)), null);
   // Bare formats ("PNG") read as image types.
   assert.equal(readCover(mp3([frame("APIC", [0, ...ascii("PNG"), 0, 3, 0, 9])])).mime, "image/png");
 });
+
+test("the cover is replaced where it stands, keeping its type and description; other pictures stay", async () => {
+  const picture = (type, description, bytes) => frame("APIC", [0, ...ascii("image/jpeg"), 0, type, ...ascii(description), 0, ...bytes]);
+  const back = picture(4, "back", [1, 1]);
+  const original = mp3([back, text("TIT2", "Clocks"), picture(3, "front", [3, 3, 3])]);
+  const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 5, 5);
+  const written = writeTags(original, { cover: { mime: "image/png", data: png } });
+  const frames = readTagFrames(written).frames;
+  assert.deepEqual(frames.map(entry => entry.id), ["APIC", "TIT2", "APIC"]);
+  assert.deepEqual([...frames[0].raw], back);
+  assert.deepEqual(readCover(written), { mime: "image/png", data: png, type: 3 });
+  assert.equal(parsePictureType(frames[2].raw), 3);
+  // Readers that take the first picture (jsmediatags does) still find the untouched back cover there.
+  assert.deepEqual((await readWithJsmediatags(written)).picture.data, [1, 1]);
+});
+
+test("a file without pictures gets a front cover; removing the cover leaves the other pictures", async () => {
+  const added = writeTags(mp3([text("TIT2", "Clocks")]), { cover: { mime: "image/jpeg", data: Uint8Array.of(9, 9) } });
+  assert.deepEqual(readCover(added), { mime: "image/jpeg", data: Uint8Array.of(9, 9), type: 3 });
+  const tags = await readWithJsmediatags(added);
+  assert.equal(tags.picture.format, "image/jpeg");
+  assert.deepEqual(tags.picture.data, [9, 9]);
+  const picture = (type, bytes) => frame("APIC", [0, ...ascii("image/jpeg"), 0, type, 0, ...bytes]);
+  const removed = writeTags(mp3([picture(4, [1]), picture(3, [3])]), { cover: null });
+  assert.deepEqual(readTagFrames(removed).frames.map(entry => parsePictureType(entry.raw)), [4]);
+  // The back cover, now the only picture, is what counts as the cover.
+  assert.deepEqual([...readCover(removed).data], [1]);
+});
+
+// A picture frame's type byte: after the encoding, the format and its terminator.
+function parsePictureType(raw) {
+  return raw[10 + 1 + raw.subarray(11).indexOf(0) + 1];
+}

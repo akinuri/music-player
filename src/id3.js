@@ -197,9 +197,26 @@ export function parsePicture(data) {
 
 // The cover in a tag (or a whole file): the front cover, else the first picture; null without one.
 export function readCover(bytes) {
-  const pictures = (readTagFrames(bytes)?.frames ?? []).filter(entry => entry.id === "APIC").map(entry => parsePicture(entry.raw.subarray(10)));
-  const picture = pictures.find(item => item.type === 3) ?? pictures[0];
-  return picture?.image.length ? { mime: picture.mime, data: picture.image } : null;
+  const frames = readTagFrames(bytes)?.frames ?? [];
+  const index = coverFrameIndex(frames);
+  const picture = index >= 0 ? parsePicture(frames[index].raw.subarray(10)) : null;
+  return picture?.image.length ? { mime: picture.mime, data: picture.image, type: picture.type } : null;
+}
+
+// Which picture frame is the cover: the front cover, else the first picture; -1 without any.
+function coverFrameIndex(frames) {
+  const pictures = frames.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.id === "APIC");
+  return (pictures.find(({ entry }) => parsePicture(entry.raw.subarray(10)).type === 3) ?? pictures[0])?.index ?? -1;
+}
+
+// A picture frame. The image goes in as bytes, not spread into an array (covers run to megabytes).
+function pictureFrame({ mime, type, description, data }, version) {
+  const encoding = encodingFor(version, [description]);
+  const head = [encoding, ...Array.from(mime, char => char.charCodeAt(0) & 0xff), 0, type, ...encodeText(description, encoding), ...terminator(encoding)];
+  const body = new Uint8Array(head.length + data.length);
+  body.set(head, 0);
+  body.set(data, head.length);
+  return frame("APIC", body, version);
 }
 
 // Where a language field (lyrics, comment) is among the frames, or -1.
@@ -234,6 +251,16 @@ export function writeTags(bytes, changes) {
   const existing = readTagFrames(bytes);
   const version = existing?.version ?? 3;
   let frames = existing?.frames ?? [];
+  // The cover replaces its picture frame where it stands, keeping its type and description (a new one is the front
+  // cover); other pictures (back cover, artist, …) stay. changes.cover: { mime, data }, or null to remove it.
+  if ("cover" in changes) {
+    const index = coverFrameIndex(frames);
+    const old = index >= 0 ? parsePicture(frames[index].raw.subarray(10)) : null;
+    const cover = changes.cover;
+    const replacement = cover ? { id: "APIC", raw: pictureFrame({ mime: cover.mime, data: cover.data, type: old?.type ?? 3, description: old?.description ?? "" }, version) } : null;
+    if (index >= 0) frames = [...frames.slice(0, index), ...(replacement ? [replacement] : []), ...frames.slice(index + 1)];
+    else if (replacement) frames = [...frames, replacement];
+  }
   // Lyrics and comments replace their frame where it stands (keeping its language and description); other such
   // frames (in other languages, or described) stay.
   for (const field of Object.keys(LANGUAGE_FIELDS)) {
@@ -250,7 +277,7 @@ export function writeTags(bytes, changes) {
   const replaced = new Set();
   const added = [];
   for (const [field, value] of Object.entries(changes)) {
-    if (field in LANGUAGE_FIELDS) continue;
+    if (field in LANGUAGE_FIELDS || field === "cover") continue;
     const id = ids[field];
     if (!id) throw new Error(`Unknown tag field: ${field}`);
     if (field === "year") YEAR_FRAMES.forEach(yearId => replaced.add(yearId));

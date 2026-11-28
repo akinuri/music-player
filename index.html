@@ -363,6 +363,22 @@
               <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft"><label for="tag-trackNumber" class="w-fit">Track</label><input id="tag-trackNumber" name="trackNumber" type="number" min="1" max="999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></div>
               <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm text-soft"><label for="tag-year" class="w-fit">Year</label><input id="tag-year" name="year" type="number" min="1000" max="9999" step="1" inputmode="numeric" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></div>
             </div>
+            <!-- The embedded cover: replaced by choosing, dropping or pasting an image, or removed; written on Save. -->
+            <div class="flex items-center gap-3">
+              <div id="tag-cover-drop" class="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-dashed border-bd-in bg-subtle text-faint transition-colors data-[dragover]:border-primary data-[dragover]:bg-accent-soft">
+                <svg aria-hidden="true" class="h-8 w-8"><use href="#icon-disc"></use></svg>
+                <img id="tag-cover-image" alt="Cover" draggable="false" title="View full size" class="absolute inset-0 hidden h-full w-full cursor-zoom-in object-contain">
+              </div>
+              <div class="flex min-w-0 flex-col gap-2">
+                <p id="tag-cover-info" aria-live="polite" class="flex flex-col gap-1 text-sm"><span id="tag-cover-label" class="text-soft">Cover</span><span id="tag-cover-details" class="text-fg"></span></p>
+                <div class="flex flex-wrap gap-1.5">
+                  <button id="tag-cover-choose" type="button" class="rounded-md border border-bd-in bg-field px-2 py-1 text-xs text-fg-2 hover:bg-tint-2 disabled:opacity-40">Choose…</button>
+                  <button id="tag-cover-remove" type="button" class="rounded-md border border-bd-in bg-field px-2 py-1 text-xs text-fg-2 hover:bg-tint-2 disabled:opacity-40">Remove</button>
+                  <button id="tag-cover-undo" type="button" class="hidden rounded-md border border-bd-in bg-field px-2 py-1 text-xs text-fg-2 hover:bg-tint-2 disabled:opacity-40">Undo</button>
+                </div>
+              </div>
+              <input id="tag-cover-file" type="file" accept="image/*" class="hidden">
+            </div>
           </div>
           <div id="tag-panel-extra" role="tabpanel" data-tag-panel="extra" aria-labelledby="tag-tab-extra" class="flex flex-col gap-3 [grid-area:1/1]">
             <div class="flex flex-col gap-1 text-sm text-soft"><label for="tag-albumArtist" class="w-fit">Album artist</label><input id="tag-albumArtist" name="albumArtist" type="text" maxlength="250" class="min-w-0 rounded-md border border-bd-in bg-field px-3 py-2 text-base text-fg outline-none focus:border-primary"></div>

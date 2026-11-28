@@ -1,6 +1,6 @@
-import { findAudioFiles, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
+import { findAudioFiles, findFolderImage, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
-import { readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
+import { readCover, readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { describeMedia, formatBytes, mediaInfoText } from "./mediainfo.js";
 import { Covers } from "./covers.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
@@ -2868,15 +2868,23 @@ async function openTagEditor(path) {
   // the lyrics and comment are the very frames saving replaces, and the extra fields are unknown to jsmediatags.
   let tags = null;
   let own = {};
+  let cover = null;
   try {
     // Dropped music may need its access asked for again after a reload (this menu click allows it).
     const file = target.drop ? await droppedFile(target.drop, { ask: true }) : await trackFile(path);
     tags = await readTags(file);
     const length = tagLength(new Uint8Array(await file.slice(0, 10).arrayBuffer()));
-    if (length) own = readFields(new Uint8Array(await file.slice(0, length).arrayBuffer()));
+    if (length) {
+      const tag = new Uint8Array(await file.slice(0, length).arrayBuffer());
+      own = readFields(tag);
+      cover = readCover(tag);
+    }
   } catch (error) {
     console.error("Could not read the tags to edit:", error);
   }
+  // Without an embedded cover, the app may be showing the folder's image; the Cover tab says so.
+  let folderImage = null;
+  if (!cover && target.folder) folderImage = await findFolderImage(target.folder.directory, target.folder.path).catch(() => null);
   // The text box keeps line breaks as \n; reading them the same way means an untouched box counts as unchanged.
   if (own.lyrics) own.lyrics = own.lyrics.replace(/\r\n?/g, "\n");
   const values = { ...(tags || track), ...Object.fromEntries(TAG_OWN_FIELDS.map(field => [field, own[field] ?? ""])) };
@@ -2902,7 +2910,9 @@ async function openTagEditor(path) {
       : !entry ? `Couldn't read the ${format.extension} file.`
       : entry.handle ? "" : `No ${entry.name} yet. Saving creates it.`;
   }
-  tagEditing = { path, original, files };
+  // The cover as opened and as it is now (the same object until it's replaced or removed).
+  tagEditing = { path, original, files, cover: { original: cover, current: cover, folderImage: folderImage?.name ?? null } };
+  renderTagCover();
   for (const field of TAG_FIELDS) $(`tag-${field}`).value = original[field];
   const fileLabel = target.drop ? target.drop.label : relativePath(path);
   $("tag-file").textContent = fileLabel;
@@ -2922,6 +2932,7 @@ async function saveTags() {
     const value = tagFieldValue(field);
     if (value !== editing.original[field]) changes[field] = value;
   }
+  if (editing.cover.current !== editing.cover.original) changes.cover = editing.cover.current && { mime: editing.cover.current.mime, data: editing.cover.current.data };
   const fileChanges = LYRICS_FORMATS.filter(format => editing.files[format.id] && lyricsFileBox(format).value !== editing.files[format.id].text);
   const tagsChanged = Object.keys(changes).length > 0;
   if (!tagsChanged && !fileChanges.length) {
@@ -3042,6 +3053,126 @@ for (const label of $("tag-form").querySelectorAll("label[for]")) {
   });
 }
 
+// The cover, on the General tab: the embedded one (see readCover), replaced by choosing, dropping or pasting an image, or removed.
+// Nothing is written until Save; Undo goes back to the cover as opened.
+let tagCoverUrl = null;
+const imageFormat = mime => ({ "image/jpeg": "JPEG", "image/png": "PNG" })[mime] ?? mime.replace(/^image\//, "").toUpperCase();
+
+function renderTagCover() {
+  const state = tagEditing?.cover;
+  if (!state) return;
+  const { current, original } = state;
+  const changed = current !== original;
+  const image = $("tag-cover-image");
+  // Its own label, like the fields', and the details below it.
+  const label = $("tag-cover-label");
+  const info = $("tag-cover-details");
+  if (tagCoverUrl) URL.revokeObjectURL(tagCoverUrl);
+  tagCoverUrl = null;
+  image.classList.toggle("hidden", !current);
+  if (current) {
+    tagCoverUrl = URL.createObjectURL(new Blob([current.data], { type: current.mime }));
+    label.textContent = changed ? "New cover" : current.type === 3 ? "Front cover" : "Cover";
+    const details = size => [size, formatBytes(current.data.length), imageFormat(current.mime)].filter(Boolean).join(" · ");
+    info.textContent = details("");
+    image.onload = () => { info.textContent = details(`${image.naturalWidth} × ${image.naturalHeight}`); };
+    image.src = tagCoverUrl;
+  } else {
+    image.onload = null;
+    image.removeAttribute("src");
+    label.textContent = "Cover";
+    info.textContent = changed ? "The cover will be removed when you save."
+      : state.folderImage ? `No embedded cover. The app shows the folder's ${state.folderImage}, which isn't changed here.`
+      : "No embedded cover. Choose, drop or paste an image.";
+  }
+  $("tag-cover-remove").disabled = !current;
+  $("tag-cover-undo").classList.toggle("hidden", !changed);
+}
+
+// Takes an image as the new cover. JPEG and PNG go in as they are (every player reads them); other formats are
+// turned into JPEG for the same reason.
+async function setTagCover(blob) {
+  const state = tagEditing?.cover;
+  if (!state || !blob) return;
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(blob);
+  } catch {
+    $("tag-cover-details").textContent = "That file isn't an image this browser can read.";
+    return;
+  }
+  let mime = blob.type;
+  let data;
+  if (mime === "image/jpeg" || mime === "image/png") {
+    data = new Uint8Array(await blob.arrayBuffer());
+  } else {
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    data = new Uint8Array(await (await canvas.convertToBlob({ type: "image/jpeg", quality: 0.92 })).arrayBuffer());
+    mime = "image/jpeg";
+  }
+  bitmap.close();
+  if (tagEditing?.cover !== state) return;
+  state.current = { mime, data, type: state.original?.type ?? 3 };
+  renderTagCover();
+}
+
+const imageIn = items => [...(items ?? [])].find(file => file.type.startsWith("image/"));
+$("tag-cover-choose").addEventListener("click", () => $("tag-cover-file").click());
+// Clicking the cover shows it full size (the image in the tag, not a thumbnail), as elsewhere.
+$("tag-cover-image").addEventListener("click", () => {
+  const image = $("tag-cover-image");
+  if (!tagCoverUrl || !image.naturalWidth) return;
+  openImageViewer(tagCoverUrl, `${$("tag-cover-label").textContent} · ${image.naturalWidth} × ${image.naturalHeight} · ${formatBytes(tagEditing.cover.current.data.length)}`);
+});
+$("tag-cover-file").addEventListener("change", () => {
+  const file = $("tag-cover-file").files[0];
+  $("tag-cover-file").value = "";
+  setTagCover(file);
+});
+$("tag-cover-remove").addEventListener("click", () => {
+  if (!tagEditing) return;
+  tagEditing.cover.current = null;
+  renderTagCover();
+});
+$("tag-cover-undo").addEventListener("click", () => {
+  if (!tagEditing) return;
+  tagEditing.cover.current = tagEditing.cover.original;
+  renderTagCover();
+});
+// An image dropped on the cover takes its place; the page's own drop handling (music onto playlists) stays out of it.
+const coverDrop = $("tag-cover-drop");
+for (const type of ["dragenter", "dragover"]) {
+  coverDrop.addEventListener(type, event => {
+    if (!event.dataTransfer?.types.includes("Files")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+    coverDrop.toggleAttribute("data-dragover", true);
+  });
+}
+coverDrop.addEventListener("dragleave", event => {
+  if (!coverDrop.contains(event.relatedTarget)) coverDrop.removeAttribute("data-dragover");
+});
+coverDrop.addEventListener("drop", event => {
+  event.preventDefault();
+  event.stopPropagation();
+  coverDrop.removeAttribute("data-dragover");
+  setTagCover(imageIn(event.dataTransfer?.files));
+});
+// Pasting an image while the General tab (where the cover is) is open sets it; pasted text goes to the fields as usual.
+document.addEventListener("paste", event => {
+  if (!tagEditor.open || currentTagTab !== "general") return;
+  const image = imageIn(event.clipboardData?.files);
+  if (!image) return;
+  event.preventDefault();
+  setTagCover(image);
+});
+tagEditor.addEventListener("close", () => {
+  if (tagCoverUrl) URL.revokeObjectURL(tagCoverUrl);
+  tagCoverUrl = null;
+});
+
 // Tabs group the fields (General, Extra, Lyrics, …): each [data-tag-tab] shows the [data-tag-panel] of the same name.
 // Hidden panels stay in place (invisible), so the dialog keeps its size.
 // A field that blocks saving (a year of 99, say) may be on another tab; its tab opens so the browser can point at it.
@@ -3068,7 +3199,9 @@ for (const format of LYRICS_FORMATS) {
   $("tag-panel-lyrics").parentElement.append(panel);
 }
 const tagTabs = [...tagEditor.querySelectorAll("[data-tag-tab]")];
+let currentTagTab = "general";
 function showTagTab(name) {
+  currentTagTab = name;
   for (const tab of tagTabs) {
     const selected = tab.dataset.tagTab === name;
     tab.setAttribute("aria-selected", String(selected));
