@@ -196,7 +196,9 @@ function registerDirectTracks(saved) {
   for (const track of saved.tracks) {
     if (!isDropped(track.path) || dropped.has(track.path) || !track.handle) continue;
     const { handle, directory, relative, ...info } = track;
-    dropped.set(track.path, { handle, directory, relative, track: { ...info } });
+    // Labelled as when it was dropped: the folder's name and the path in it, or the file's name.
+    const label = directory ? `${directory.name}/${relative}` : relative;
+    dropped.set(track.path, { handle, directory, relative, label, track: { ...info } });
   }
 }
 
@@ -1330,7 +1332,9 @@ function render() {
       });
       row.addEventListener("contextmenu", event => {
         event.preventDefault();
-        openContextMenu(row, () => removeSavedTrack(selected, index), event, selectedPlaylistPaths?.[index]);
+        // The track as matched to the library; until matching is done (or if it stalls), its saved key, which is the
+        // library's own when its folder hasn't changed.
+        openContextMenu(row, () => removeSavedTrack(selected, index), event, selectedPlaylistPaths?.[index] ?? track.path);
       });
       makeReorderable(row, index, elements["saved-playlists"], (from, to) => updateSavedTracks(selected, moveItem(selected.tracks, from, to), "reorder"));
       elements["saved-playlists"].append(row);
@@ -1556,8 +1560,35 @@ function hideContextMenu() {
   contextInfoPath = null;
 }
 
-// Only library MP3s can have their tags edited (not dropped music, nor tracks missing from the library).
-const canEditTags = path => !!path && !isDropped(path) && !!library?.tracks.some(track => track.path === path);
+// Where an MP3's tags can be written, for library tracks and dropped music alike (null when they can't):
+// - scope: what write access is asked for (the library folder, the dropped folder, or a dropped file itself);
+// - fileHandle(): the track's file;
+// - folder: the folder and path its lyrics files sit next to (null for a single dropped file, whose folder the browser
+//   doesn't give);
+// - source or drop: where the track comes from.
+function tagTarget(path) {
+  if (!path || !/\.mp3$/i.test(path)) return null;
+  const drop = dropped.get(path);
+  if (drop) {
+    // Music dropped without a file handle (a browser without them) can be read but not written.
+    if (!drop.handle && !drop.directory) return null;
+    return {
+      drop,
+      scope: drop.directory || drop.handle,
+      fileHandle: () => drop.handle || getTrackFileHandle(drop.directory, drop.relative),
+      folder: drop.directory ? { directory: drop.directory, path: drop.relative } : null
+    };
+  }
+  const source = sourceOf(path);
+  if (!source || !library?.tracks.some(track => track.path === path)) return null;
+  return {
+    source,
+    scope: source.handle,
+    fileHandle: () => getTrackFileHandle(source.handle, relativePath(path)),
+    folder: { directory: source.handle, path: relativePath(path) }
+  };
+}
+const canEditTags = path => !!tagTarget(path);
 
 // The menu shows the items that apply: "Media info" for a track whose file can be reached and "Edit tags" for a library
 // track (trackPath), "Remove from playlist" when the row is in one (onRemove). Without any, there is nothing to show.
@@ -2604,10 +2635,10 @@ function setTagStatus(text, error = false) {
 
 async function openTagEditor(path) {
   const track = trackFor(path);
-  const source = sourceOf(path);
-  if (!track || !source) return;
-  if (permissionOf(source) !== "granted") {
-    notice(`Reconnect "${source.name}" before editing its tracks.`, true);
+  const target = tagTarget(path);
+  if (!track || !target) return;
+  if (target.source && permissionOf(target.source) !== "granted") {
+    notice(`Reconnect "${target.source.name}" before editing its tracks.`, true);
     return;
   }
   // The file's own tags; the library's values stand in when they can't be read (its title may be the file name).
@@ -2616,7 +2647,8 @@ async function openTagEditor(path) {
   let tags = null;
   let own = {};
   try {
-    const file = await trackFile(path);
+    // Dropped music may need its access asked for again after a reload (this menu click allows it).
+    const file = target.drop ? await droppedFile(target.drop, { ask: true }) : await trackFile(path);
     tags = await readTags(file);
     const length = tagLength(new Uint8Array(await file.slice(0, 10).arrayBuffer()));
     if (length) own = readFields(new Uint8Array(await file.slice(0, length).arrayBuffer()));
@@ -2631,23 +2663,28 @@ async function openTagEditor(path) {
   const files = {};
   for (const format of LYRICS_FORMATS) {
     let entry = null;
-    try {
-      const found = await findSibling(source.handle, relativePath(path), format.extension);
-      const raw = found.handle ? decodeText(await (await found.handle.getFile()).arrayBuffer()) : "";
-      entry = { ...found, text: raw.replace(/\r\n?/g, "\n"), crlf: raw.includes("\r\n") };
-    } catch (error) {
-      console.error(`Could not read the ${format.extension} file:`, error);
+    if (target.folder) {
+      try {
+        const found = await findSibling(target.folder.directory, target.folder.path, format.extension);
+        const raw = found.handle ? decodeText(await (await found.handle.getFile()).arrayBuffer()) : "";
+        entry = { ...found, text: raw.replace(/\r\n?/g, "\n"), crlf: raw.includes("\r\n") };
+      } catch (error) {
+        console.error(`Could not read the ${format.extension} file:`, error);
+      }
     }
     files[format.id] = entry;
     const box = lyricsFileBox(format);
     box.value = entry?.text ?? "";
     box.disabled = !entry;
-    box.placeholder = !entry ? `Couldn't read the ${format.extension} file.` : entry.handle ? "" : `No ${entry.name} yet. Saving creates it.`;
+    box.placeholder = !target.folder ? `A single dropped file doesn't give access to its folder, where ${format.extension} files sit. Drop the folder instead.`
+      : !entry ? `Couldn't read the ${format.extension} file.`
+      : entry.handle ? "" : `No ${entry.name} yet. Saving creates it.`;
   }
   tagEditing = { path, original, files };
   for (const field of TAG_FIELDS) $(`tag-${field}`).value = original[field];
-  $("tag-file").textContent = relativePath(path);
-  $("tag-file").title = relativePath(path);
+  const fileLabel = target.drop ? target.drop.label : relativePath(path);
+  $("tag-file").textContent = fileLabel;
+  $("tag-file").title = fileLabel;
   setTagStatus("");
   $("tag-save").disabled = false;
   showTagTab("general");
@@ -2670,16 +2707,21 @@ async function saveTags() {
     return;
   }
   const { path } = editing;
-  const source = sourceOf(path);
+  const target = tagTarget(path);
+  if (!target) {
+    setTagStatus("This track's file can no longer be reached.", true);
+    return;
+  }
   $("tag-save").disabled = true;
   setTagStatus("Saving…");
   tagSavingPath = path;
   // The playing track is reloaded from the new file, where it was.
   const playing = tagsChanged && player.path === path ? { time: player.audio.currentTime || 0, paused: player.audio.paused } : null;
   try {
-    // Changing files needs more than the read access the library has; asked once per folder (this click allows it).
-    if (await source.handle.queryPermission({ mode: "readwrite" }) !== "granted" && await source.handle.requestPermission({ mode: "readwrite" }) !== "granted") {
-      throw new TagWriteError("Saving needs permission to change files in this folder.");
+    // Changing files needs more than the read access playing has; asked once per folder, or per dropped file (this
+    // click allows it).
+    if (await target.scope.queryPermission({ mode: "readwrite" }) !== "granted" && await target.scope.requestPermission({ mode: "readwrite" }) !== "granted") {
+      throw new TagWriteError(`Saving needs permission to change ${target.scope.kind === "file" ? "this file" : "files in this folder"}.`);
     }
     // Lyrics files first: they're small, and the track's tags may then be saved knowing they went through.
     for (const format of fileChanges) {
@@ -2705,36 +2747,45 @@ async function saveTags() {
       notice(`Saved ${fileChanges.map(format => editing.files[format.id].name).join(" and ")}.`);
       return;
     }
-    const handle = await getTrackFileHandle(source.handle, relativePath(path));
+    const handle = await target.fileHandle();
     const bytes = writeTags(new Uint8Array(await (await handle.getFile()).arrayBuffer()), changes);
     // The browser writes to a copy and swaps it in on close, so a failure leaves the file as it was.
     const writable = await handle.createWritable();
     await writable.write(bytes);
     await writable.close();
     const file = await handle.getFile();
-    const metadata = await readMetadata(file);
-    const track = trackFor(path);
-    const updated = {
-      ...track,
-      title: metadata.title || file.name.replace(/\.mp3$/i, ""),
-      artist: metadata.artist,
-      album: metadata.album,
-      trackNumber: metadata.trackNumber,
-      year: metadata.year,
-      duration: metadata.duration ?? track.duration,
-      size: file.size,
-      lastModified: file.lastModified
-    };
-    const next = { ...library, tracks: library.tracks.map(item => item.path === path ? updated : item) };
-    await saveLibrary(next);
-    library = next;
+    if (target.source) {
+      const metadata = await readMetadata(file);
+      const track = trackFor(path);
+      const updated = {
+        ...track,
+        title: metadata.title || file.name.replace(/\.mp3$/i, ""),
+        artist: metadata.artist,
+        album: metadata.album,
+        trackNumber: metadata.trackNumber,
+        year: metadata.year,
+        duration: metadata.duration ?? track.duration,
+        size: file.size,
+        lastModified: file.lastModified
+      };
+      const next = { ...library, tracks: library.tracks.map(item => item.path === path ? updated : item) };
+      await saveLibrary(next);
+      library = next;
+    } else {
+      // Dropped music plays from the file it was given; that one is now out of date. Its details are read again, which
+      // also updates the direct-play playlists that keep it.
+      target.drop.file = file;
+      await fillDropDetails([path]);
+    }
     // Embedded lyrics win in the Lyrics view; read them again.
     lyricsCache.delete(path);
     tagEditing = null;
     tagEditor.close();
-    notice(`Saved the tags of ${relativePath(path)}${fileChanges.length ? ` and ${fileChanges.map(format => editing.files[format.id].name).join(" and ")}` : ""}.`);
+    const name = target.drop ? target.drop.label : relativePath(path);
+    notice(`Saved the tags of ${name}${fileChanges.length ? ` and ${fileChanges.map(format => editing.files[format.id].name).join(" and ")}` : ""}.`);
     if (playing && player.path === path) {
-      await player.play(source.handle, path, { filePath: relativePath(path), startAt: playing.time, autoplay: !playing.paused });
+      const reload = { startAt: playing.time, autoplay: !playing.paused };
+      await (target.source ? player.play(target.source.handle, path, { ...reload, filePath: relativePath(path) }) : player.play(null, path, { ...reload, file }));
     }
   } catch (error) {
     if (!(error instanceof TagWriteError)) console.error("Could not save the tags:", error);
