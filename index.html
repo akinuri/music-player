@@ -54,16 +54,16 @@
     <main class="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-4 px-4 pb-12 pt-5 sm:px-6 lg:h-screen lg:min-h-0 lg:px-8">
       <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         <aside class="flex shrink-0 self-stretch flex-col gap-3 lg:max-h-full lg:w-[200px] lg:self-start">
-          <nav data-panel class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Music navigation">
+          <nav data-panel class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-1.5 py-1.5 text-fg-2 shadow-sm" aria-label="Music navigation">
             <div class="flex min-h-0 flex-col gap-0.5 lg:overflow-y-auto">
               <button id="nav-library" type="button" class="flex min-w-0 items-center justify-between rounded-md bg-sel px-2.5 py-1.5 text-left text-base font-semibold text-deep hover:bg-accent-soft"><span>Library</span><span id="track-count" class="ml-2 text-deep-2">0</span></button>
-              <div class="ml-3 flex flex-col gap-0.5 border-l border-bd pl-2">
-                <button id="nav-artist" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base hover:bg-tint"><span>Artists</span><span id="artist-nav-count" class="ml-2 text-soft">0</span></button>
-                <button id="nav-album" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base hover:bg-tint"><span>Albums</span><span id="album-nav-count" class="ml-2 text-soft">0</span></button>
-                <button id="nav-track" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base hover:bg-tint"><span>Tracks</span><span id="track-nav-count" class="ml-2 text-soft">0</span></button>
+              <div class="ml-2 flex flex-col gap-0.5 border-l border-bd pl-1.5">
+                <button id="nav-artist" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2 py-1 text-left text-sm hover:bg-tint"><span>Artists</span><span id="artist-nav-count" class="ml-2 tabular-nums text-soft">0</span></button>
+                <button id="nav-album" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2 py-1 text-left text-sm hover:bg-tint"><span>Albums</span><span id="album-nav-count" class="ml-2 tabular-nums text-soft">0</span></button>
+                <button id="nav-track" type="button" class="flex min-w-0 items-center justify-between rounded-md px-2 py-1 text-left text-sm hover:bg-tint"><span>Tracks</span><span id="track-nav-count" class="ml-2 tabular-nums text-soft">0</span></button>
               </div>
               <button id="nav-playlists" type="button" class="mt-1.5 flex min-w-0 items-center justify-between rounded-md px-2.5 py-1.5 text-left text-base font-medium text-fg-2 hover:bg-tint"><span>Playlists</span><span id="playlist-nav-count" class="ml-2 text-soft">0</span></button>
-              <div id="playlist-nav-items" class="ml-3 flex flex-col gap-0.5 border-l border-bd pl-2"></div>
+              <div id="playlist-nav-items" class="ml-2 flex flex-col gap-0.5 border-l border-bd pl-1.5"></div>
             </div>
           </nav>
           <nav data-panel class="flex shrink-0 flex-col gap-0.5 rounded-xl border border-bd bg-surface px-2 py-2 text-fg-2 shadow-sm" aria-label="Apps">

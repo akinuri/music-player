@@ -1070,12 +1070,15 @@ function render() {
     const nav = document.createElement("button");
     nav.type = "button";
     nav.dataset.playlistId = saved.id;
-    nav.className = "flex min-w-0 items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-base hover:bg-tint";
+    nav.className = "flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-tint";
+    // One line per playlist; a long name is cut short, and given in full on hover (only then: a tooltip repeating a name
+    // in plain view says nothing). Set as the pointer arrives, before the tooltip reads it.
     const name = document.createElement("span");
-    name.className = "min-w-0 break-words";
+    name.className = "min-w-0 truncate";
     name.textContent = saved.name;
+    nav.addEventListener("pointerover", () => { nav.title = name.scrollWidth > name.clientWidth ? saved.name : ""; });
     const count = document.createElement("span");
-    count.className = "shrink-0 text-soft";
+    count.className = "shrink-0 tabular-nums text-soft";
     count.textContent = saved.tracks.length.toLocaleString();
     nav.append(name, count);
     const active = currentView === "playlists" && selectedPlaylistId === saved.id;
