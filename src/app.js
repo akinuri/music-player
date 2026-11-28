@@ -16,7 +16,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-reload", "context-install", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle", "now-cover", "library-cover", "library-header-rows", "library-header-top", "library-header-controls", "library-header-static", "album-grid", "album-view-controls", "album-sort-controls", "album-sort", "album-sort-direction"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-focus", "context-reload", "context-install", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle", "now-cover", "library-cover", "library-header-rows", "library-header-top", "library-header-controls", "library-header-static", "album-grid", "album-view-controls", "album-sort-controls", "album-sort", "album-sort-direction"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -382,20 +382,67 @@ let nowCoverPath;
 function renderNowCover() {
   if (player.path === nowCoverPath) return;
   nowCoverPath = player.path;
+  // Another track: focus mode's full-size cover of the last one goes.
+  if (focusArtUrl) URL.revokeObjectURL(focusArtUrl);
+  focusArtUrl = null;
   const image = elements["now-cover"];
   image.classList.add("hidden");
   image.removeAttribute("src");
   if (!player.path) return;
   const path = player.path;
   covers.track(path).then(url => {
-    if (!url || player.path !== path) return;
+    // Focus mode may already show the full-size cover; the thumbnail doesn't replace it.
+    if (!url || player.path !== path || (focusArtUrl && image.src === focusArtUrl)) return;
     image.src = url;
     image.classList.remove("hidden");
   });
 }
 
+// Focus mode shows the playing track's cover at full size on its stage (a thumbnail would look soft there) and,
+// blurred, as the backdrop behind everything (the thumbnail is plenty for that).
+let focusArtPath;
+let focusArtUrl = null;
+let backdropLayer = 0;
+function renderFocusArt() {
+  const path = focusMode ? player.path : null;
+  if (path === focusArtPath) return;
+  focusArtPath = path;
+  if (!path) {
+    if (!focusMode) setBackdrop(null);
+    return;
+  }
+  covers.track(path).then(url => {
+    if (focusArtPath === path) setBackdrop(url);
+  });
+  covers.image(path).then(image => {
+    if (!image || focusArtPath !== path || player.path !== path) return;
+    if (focusArtUrl) URL.revokeObjectURL(focusArtUrl);
+    focusArtUrl = URL.createObjectURL(image);
+    elements["now-cover"].src = focusArtUrl;
+    elements["now-cover"].classList.remove("hidden");
+  }).catch(() => {});
+}
+
+// Cross-fades the backdrop to a cover (null: the plain gradient).
+function setBackdrop(url) {
+  const layers = document.querySelectorAll(".focus-backdrop-layer");
+  if (!url) {
+    for (const layer of layers) layer.removeAttribute("data-shown");
+    return;
+  }
+  backdropLayer ^= 1;
+  const next = layers[backdropLayer];
+  const previous = layers[backdropLayer ^ 1];
+  next.onload = () => {
+    next.toggleAttribute("data-shown", true);
+    previous.removeAttribute("data-shown");
+  };
+  next.src = url;
+}
+
 function renderPlayback() {
   renderNowCover();
+  renderFocusArt();
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
   setTitle(elements["now-playing"], player.path ? track?.title || relativePath(player.path) : "Nothing playing", track?.trackNumber);
@@ -1730,11 +1777,11 @@ function openContextMenu(row, onRemove, event, trackPath = null) {
 
 // Shows the given items (the rest are hidden) and focuses the first, for the arrow keys.
 function showContextItems(shown) {
-  for (const name of ["info", "tags", "remove", "reload", "install"]) {
+  for (const name of ["info", "tags", "remove", "focus", "reload", "install"]) {
     const item = elements[`context-${name}`];
     item.classList.toggle("hidden", !shown[name]);
     item.classList.toggle("flex", !!shown[name]);
-    item.disabled = busy && name !== "reload" && name !== "install";
+    item.disabled = busy && !["focus", "reload", "install"].includes(name);
   }
 }
 
@@ -1750,7 +1797,9 @@ function placeContextMenu(x, y) {
 // Anywhere else, the menu holds what applies to the whole app.
 function openGeneralMenu(event) {
   hideContextMenu();
-  showContextItems({ reload: true, install: !!installPrompt });
+  elements["context-focus"].lastChild.textContent = focusMode ? "Leave focus mode" : "Focus mode";
+  elements["context-focus"].querySelector("use").setAttribute("href", focusMode ? "#icon-unfocus" : "#icon-focus");
+  showContextItems({ focus: true, reload: true, install: !!installPrompt });
   const keyboard = event.clientX === 0 && event.clientY === 0;
   placeContextMenu(keyboard ? 24 : event.clientX, keyboard ? 24 : event.clientY);
 }
@@ -3582,8 +3631,8 @@ function scheduleIdleVisualizer() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     const typing = document.activeElement?.matches("input:not([type=range]), textarea");
-    // Lyrics are being read along, so stay there.
-    if (!player.path || player.audio.paused || currentView === "visualizer" || currentView === "lyrics" || typing || document.hidden) return;
+    // Lyrics are being read along, so stay there; in focus mode the view isn't shown at all.
+    if (!player.path || player.audio.paused || currentView === "visualizer" || currentView === "lyrics" || focusMode || typing || document.hidden) return;
     currentView = "visualizer";
     render();
   }, IDLE_VISUALIZER_MS);
@@ -3703,6 +3752,8 @@ document.addEventListener("pointerdown", event => {
 });
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !elements["context-menu"].classList.contains("hidden")) {
+    // Handled: closing the menu is all this Escape does (focus mode stays).
+    event.preventDefault();
     const row = contextRow;
     hideContextMenu();
     row?.focus();
@@ -3722,6 +3773,71 @@ document.addEventListener("contextmenu", event => {
   if (!rowMenuOpen && !event.target.closest?.("dialog, [data-no-context-menu]")) openGeneralMenu(event);
 });
 elements["context-reload"].addEventListener("click", () => location.reload());
+
+// Focus mode: only the player column, centred, for listening rather than browsing; the library, playlists and apps are
+// hidden. The panels it may show besides the player (focusPanels; the current playlist for now) each have a toggle.
+// Both are remembered per browser.
+let focusMode = false;
+const focusPanels = { playlist: true };
+try {
+  focusMode = localStorage.getItem("focusMode") === "1";
+  const stored = JSON.parse(localStorage.getItem("focusPanels"));
+  for (const name of Object.keys(focusPanels)) if (typeof stored?.[name] === "boolean") focusPanels[name] = stored[name];
+} catch {}
+const focusPanelElements = { playlist: () => $("playlist-panel") };
+const focusPanelNames = { playlist: "playlist" };
+
+function renderFocus() {
+  document.documentElement.toggleAttribute("data-focus", focusMode);
+  const toggle = $("focus-mode");
+  toggle.setAttribute("aria-pressed", String(focusMode));
+  toggle.setAttribute("aria-label", focusMode ? "Leave focus mode" : "Focus mode");
+  toggle.title = focusMode ? "Leave focus mode (Esc)" : "Focus mode";
+  toggle.querySelector("use").setAttribute("href", focusMode ? "#icon-unfocus" : "#icon-focus");
+  $("focus-theme").classList.toggle("hidden", !focusMode);
+  $("focus-theme").classList.toggle("flex", focusMode);
+  for (const [name, shown] of Object.entries(focusPanels)) {
+    focusPanelElements[name]().classList.toggle("focus-off", !shown);
+    const button = document.querySelector(`[data-focus-panel="${name}"]`);
+    button.classList.toggle("hidden", !focusMode);
+    button.classList.toggle("flex", focusMode);
+    button.setAttribute("aria-pressed", String(shown));
+    button.title = `${shown ? "Hide" : "Show"} ${focusPanelNames[name]}`;
+    button.setAttribute("aria-label", button.title);
+  }
+  $("player-column").classList.toggle("focus-alone", !Object.values(focusPanels).some(Boolean));
+  renderFocusArt();
+}
+
+function setFocusMode(on) {
+  focusMode = on;
+  try { localStorage.setItem("focusMode", on ? "1" : "0"); } catch {}
+  // A soft cross-fade between the two looks, where the browser can.
+  if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) document.startViewTransition(renderFocus);
+  else renderFocus();
+}
+
+$("focus-mode").addEventListener("click", () => setFocusMode(!focusMode));
+elements["context-focus"].addEventListener("click", () => {
+  hideContextMenu();
+  setFocusMode(!focusMode);
+});
+for (const button of document.querySelectorAll("[data-focus-panel]")) {
+  button.addEventListener("click", () => {
+    const name = button.dataset.focusPanel;
+    focusPanels[name] = !focusPanels[name];
+    try { localStorage.setItem("focusPanels", JSON.stringify(focusPanels)); } catch {}
+    renderFocus();
+  });
+}
+// Escape leaves focus mode, unless it's closing something else (a dialog, a menu) or editing a field.
+document.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || !focusMode || event.defaultPrevented) return;
+  if (document.querySelector("dialog[open]") || !elements["context-menu"].classList.contains("hidden")) return;
+  if (event.target.closest?.("input, textarea, select")) return;
+  setFocusMode(false);
+});
+renderFocus();
 
 // Installing as an app (its own window, the Start menu; see manifest.webmanifest). The browser says when it can be
 // installed; until then, and once installed, the menu doesn't offer it.
@@ -4365,6 +4481,23 @@ function renderThemeSwitch() {
 for (const button of themeButtons) button.addEventListener("click", () => setPreference(button.dataset.themeOption));
 document.addEventListener("themechange", renderThemeSwitch);
 renderThemeSwitch();
+
+// In focus mode the sidebar (and its theme switch) is away; a button on the stage steps through the same choices.
+const THEME_CYCLE = ["system", "light", "dark"];
+const themeNames = { system: "System", light: "Light", dark: "Dark" };
+function renderFocusTheme() {
+  const preference = currentPreference();
+  const next = THEME_CYCLE[(THEME_CYCLE.indexOf(preference) + 1) % THEME_CYCLE.length];
+  const button = $("focus-theme");
+  button.querySelector("use").setAttribute("href", `#icon-theme-${preference}`);
+  button.title = `Theme: ${themeNames[preference]} (click for ${themeNames[next]})`;
+  button.setAttribute("aria-label", button.title);
+}
+$("focus-theme").addEventListener("click", () => {
+  setPreference(THEME_CYCLE[(THEME_CYCLE.indexOf(currentPreference()) + 1) % THEME_CYCLE.length]);
+});
+document.addEventListener("themechange", renderFocusTheme);
+renderFocusTheme();
 initTooltips();
 const ready = init();
 

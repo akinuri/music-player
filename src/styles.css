@@ -150,3 +150,145 @@ button {
     transition: none;
   }
 }
+
+/* Focus mode (<html data-focus>): a room for the playing song rather than the library. The playing track's cover,
+   blurred and darkened, fills the screen; the player becomes a stage (big cover, big title) and the panels beside it
+   (the current playlist, toggled with .focus-off) frosted glass. The library and apps (.focus-hidden) step away.
+   It follows the theme: every colour comes from the theme's variables, so light is milky glass over a light veil and
+   dark is smoked glass over a dark one (and themes that set the variables carry over). */
+html[data-focus] .focus-hidden,
+html[data-focus] .focus-off {
+  display: none !important;
+}
+html[data-focus] body {
+  background: rgb(var(--c-page));
+}
+
+/* The backdrop: two cover layers that cross-fade as tracks change, under a veil of the page colour (light or dark)
+   so text stays readable. Without a cover, a soft gradient in the theme's accent. */
+html[data-focus] #focus-backdrop {
+  display: block;
+  background: radial-gradient(120% 90% at 30% 20%, rgb(var(--c-accent-soft-2)), rgb(var(--c-page)) 70%);
+}
+#focus-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(var(--c-page) / 0.5), rgb(var(--c-page) / 0.72));
+}
+.focus-backdrop-layer {
+  position: absolute;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  object-fit: cover;
+  filter: blur(64px) saturate(1.4);
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+.focus-backdrop-layer[data-shown] {
+  opacity: 1;
+}
+
+/* The stage and the glass panels. */
+html[data-focus] #player-column {
+  width: 100%;
+  max-width: 76rem;
+  margin-inline: auto;
+  gap: 1.5rem;
+  /* Not a scroller here (the playlist scrolls within its panel), so the panels' shadows aren't cut off. */
+  overflow: visible;
+}
+@media (min-width: 1024px) {
+  html[data-focus] #player-column {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  html[data-focus] #playlist-panel {
+    flex: none;
+    width: 26rem;
+  }
+}
+html[data-focus] #player-column > [data-panel] {
+  position: relative;
+  isolation: isolate;
+  background: rgb(var(--c-surface) / 0.55);
+  border-color: rgb(var(--c-bd) / 0.6);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.12);
+}
+html.dark[data-focus] #player-column > [data-panel] {
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.35);
+}
+/* The frosting sits on a layer behind each panel's content: a backdrop-filter on the panel itself would make it the
+   frame of reference for the fixed-position menus inside (speed, gap), which place themselves against the window. */
+html[data-focus] #player-column > [data-panel]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  backdrop-filter: blur(28px) saturate(1.3);
+}
+html[data-focus] #player-column .bg-head {
+  background: rgb(var(--c-head) / 0.45);
+}
+html[data-focus] #player-card {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2.5rem 2rem;
+}
+/* Everything on the stage keeps to a readable width, centred. */
+html[data-focus] #player-card > * {
+  width: 100%;
+  max-width: 34rem;
+  margin-inline: auto;
+}
+html[data-focus] #now-row {
+  flex-direction: column;
+  gap: 1.5rem;
+  text-align: center;
+}
+html[data-focus] #now-cover-tile {
+  width: min(22rem, 70vw, 42vh);
+  height: min(22rem, 70vw, 42vh);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.12);
+}
+html.dark[data-focus] #now-cover-tile {
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.28);
+}
+html[data-focus] #now-cover-tile > svg {
+  width: 30%;
+  height: 30%;
+}
+html[data-focus] #now-text {
+  width: 100%;
+}
+html[data-focus] #now-playing {
+  height: auto;
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+html[data-focus] #now-artist {
+  height: auto;
+  margin-top: 0.5rem;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+html[data-focus] #focus-buttons {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: auto;
+}
+/* With nothing beside it, the stage is centred on its own. */
+html[data-focus] #player-column.focus-alone {
+  max-width: 44rem;
+}

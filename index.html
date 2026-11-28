@@ -52,12 +52,20 @@
       <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-load" viewBox="0 0 24 24"><path d="M4 5h10M4 10h10M4 15h6m4 0 3 3 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-disc" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-focus" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-unfocus" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-list" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
       <symbol id="icon-help" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-info" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </svg>
+    <!-- Focus mode's backdrop: the playing track's cover, blurred and darkened; two layers to cross-fade between. -->
+    <div id="focus-backdrop" aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 hidden overflow-hidden">
+      <img alt="" class="focus-backdrop-layer" data-layer="0">
+      <img alt="" class="focus-backdrop-layer" data-layer="1">
+    </div>
     <main class="mx-auto flex min-h-screen max-w-[1920px] flex-col gap-4 p-5 lg:h-screen lg:min-h-0">
       <div class="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
-        <aside class="flex shrink-0 self-stretch flex-col gap-3 lg:max-h-full lg:w-[200px] lg:self-start">
+        <aside class="focus-hidden flex shrink-0 self-stretch flex-col gap-3 lg:max-h-full lg:w-[200px] lg:self-start">
           <nav data-panel class="flex min-h-0 flex-col rounded-xl border border-bd bg-surface px-1.5 py-1.5 text-fg-2 shadow-sm" aria-label="Music navigation">
             <div class="flex min-h-0 flex-col gap-0.5 lg:overflow-y-auto">
               <button id="nav-library" type="button" class="flex min-w-0 items-center justify-between rounded-md bg-sel px-2.5 py-1.5 text-left text-base font-semibold text-deep hover:bg-accent-soft"><span>Library</span><span id="track-count" class="ml-2 text-deep-2">0</span></button>
@@ -100,7 +108,7 @@
           </div>
         </aside>
 
-        <section data-panel id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
+        <section data-panel id="library-view" class="focus-hidden flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
           <div class="border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <!-- Album views: two rows that don't wrap (the title and counts, then the controls), an album page's cover
                  spanning both. Elsewhere the rows dissolve into one wrapping row (render sets the classes). -->
@@ -175,7 +183,7 @@
           </div>
         </section>
 
-        <section data-panel id="playlists-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
+        <section data-panel id="playlists-view" class="focus-hidden hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="saved-playlists-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="saved-playlists-heading" tabindex="-1" class="min-w-0 break-words text-lg font-semibold tracking-tight"><span id="saved-title" class="flex flex-wrap items-center gap-x-1.5">Playlists</span></h2>
             <div id="saved-meta" class="flex flex-wrap gap-2 text-sm"></div>
@@ -196,7 +204,7 @@
           </div>
         </section>
 
-        <section data-panel id="analysis-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
+        <section data-panel id="analysis-view" class="focus-hidden hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="analysis-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="analysis-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="analysis-title" class="flex flex-wrap items-center gap-x-1.5">Analysis</span></h2>
             <div id="analysis-meta" class="flex flex-wrap gap-2 text-sm"></div>
@@ -212,7 +220,7 @@
           </div>
         </section>
 
-        <section data-panel id="visualizer-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
+        <section data-panel id="visualizer-view" class="focus-hidden hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="visualizer-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="visualizer-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Visualizer</h2>
             <div class="ml-auto flex items-center gap-2 text-sm text-soft">
@@ -243,7 +251,7 @@
           </div>
         </section>
 
-        <section data-panel id="lyrics-view" class="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
+        <section data-panel id="lyrics-view" class="focus-hidden hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="lyrics-heading">
           <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
             <h2 id="lyrics-heading" tabindex="-1" class="text-lg font-semibold tracking-tight">Lyrics</h2>
             <div id="lyrics-meta" class="flex min-w-0 flex-wrap gap-2 text-sm"></div>
@@ -262,17 +270,23 @@
           </div>
         </section>
 
-        <div class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[clamp(380px,32vw,460px)] lg:shrink-0 lg:overflow-y-auto">
-          <section data-panel class="shrink-0 rounded-xl border border-bd bg-surface p-5 shadow-sm" aria-label="Playback controls">
-            <div class="flex min-w-0 items-center gap-3">
+        <div id="player-column" class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[clamp(380px,32vw,460px)] lg:shrink-0 lg:overflow-y-auto">
+          <section data-panel id="player-card" class="shrink-0 rounded-xl border border-bd bg-surface p-5 shadow-sm" aria-label="Playback controls">
+            <div id="now-row" class="flex min-w-0 items-center gap-3">
               <!-- The playing track's cover; a disc stands in without one. -->
-              <div class="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-bd bg-subtle text-faint">
+              <div id="now-cover-tile" class="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-bd bg-subtle text-faint">
                 <svg aria-hidden="true" class="absolute inset-0 m-auto h-6 w-6"><use href="#icon-disc"></use></svg>
                 <img id="now-cover" alt="" draggable="false" title="View full size" class="absolute inset-0 hidden h-full w-full cursor-zoom-in object-cover">
               </div>
-              <div class="min-w-0 flex-1">
+              <div id="now-text" class="min-w-0 flex-1">
                 <p id="now-playing" class="h-6 truncate text-base font-semibold text-fg-2">Nothing playing</p>
                 <p id="now-artist" class="mt-1 h-6 truncate text-base text-soft"></p>
+              </div>
+              <!-- Focus mode: only the player (and the panels toggled on here) for listening rather than browsing. -->
+              <div id="focus-buttons" class="flex shrink-0 gap-1 self-start">
+                <button id="focus-theme" type="button" class="hidden flex h-7 w-7 items-center justify-center rounded-md text-soft hover:bg-tint-2 hover:text-fg-2 aria-pressed:text-deep"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-theme-system"></use></svg></button>
+                <button id="focus-playlist" type="button" data-focus-panel="playlist" class="hidden flex h-7 w-7 items-center justify-center rounded-md text-soft hover:bg-tint-2 hover:text-fg-2 aria-pressed:text-deep"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-list"></use></svg></button>
+                <button id="focus-mode" type="button" class="flex h-7 w-7 items-center justify-center rounded-md text-soft hover:bg-tint-2 hover:text-fg-2 aria-pressed:text-deep"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-focus"></use></svg></button>
               </div>
             </div>
             <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-soft">
@@ -296,7 +310,7 @@
             </div>
           </section>
 
-          <section data-panel class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
+          <section data-panel id="playlist-panel" class="flex min-h-[220px] min-w-0 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm lg:flex-1" aria-labelledby="playlist-heading">
             <div class="flex items-center justify-between gap-3 border-b border-bd-2 bg-head px-4 py-3">
               <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 <h2 id="playlist-heading" tabindex="-1" class="text-base font-semibold">Current playlist</h2>
@@ -439,6 +453,7 @@
       <button id="context-info" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-info"></use></svg>Media info</button>
       <button id="context-tags" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rename"></use></svg>Edit tags</button>
       <button id="context-remove" type="button" role="menuitem" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg>Remove from playlist</button>
+      <button id="context-focus" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-focus"></use></svg>Focus mode</button>
       <button id="context-reload" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rescan"></use></svg>Reload</button>
       <button id="context-install" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-import"></use></svg>Install app</button>
     </div>
