@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#e6eaed">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icons/icon-192.png" type="image/png">
     <script>
       // Applies the saved theme before first paint to avoid a flash of the wrong one (keep in sync with src/theme.js).
       (function () {
@@ -432,6 +434,7 @@
       <button id="context-tags" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rename"></use></svg>Edit tags</button>
       <button id="context-remove" type="button" role="menuitem" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-clear"></use></svg>Remove from playlist</button>
       <button id="context-reload" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-rescan"></use></svg>Reload</button>
+      <button id="context-install" type="button" role="menuitem" class="hidden w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-none disabled:opacity-40"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-import"></use></svg>Install app</button>
     </div>
     <!-- Notices float over the top-right corner, so showing one never moves the page. -->
     <div id="notice" class="hidden">

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A static, client-side music player for a local audio collection (no backend). It uses the File System Access API, so it only runs in Chromium over HTTPS or localhost. It is published to GitHub Pages (`akinuri.github.io/music-player`) as `index.html` + `dist/`. See README.md for the feature list.
+A static, client-side music player for a local audio collection (no backend). It uses the File System Access API, so it only runs in Chromium over HTTPS or localhost. It is published to GitHub Pages (`akinuri.github.io/music-player`) as `index.html` + `dist/`, plus `manifest.webmanifest`, `sw.js` (network-first service worker, offline fallback) and `icons/` for installing it as an app. See README.md for the feature list.
 
 ## Commands
 

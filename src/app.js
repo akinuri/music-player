@@ -16,7 +16,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-reload", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle", "now-cover", "library-cover", "library-header-rows", "library-header-top", "library-header-controls", "library-header-static", "album-grid", "album-view-controls", "album-sort-controls", "album-sort", "album-sort-direction"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-reload", "context-install", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle", "now-cover", "library-cover", "library-header-rows", "library-header-top", "library-header-controls", "library-header-static", "album-grid", "album-view-controls", "album-sort-controls", "album-sort", "album-sort-direction"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -1730,11 +1730,11 @@ function openContextMenu(row, onRemove, event, trackPath = null) {
 
 // Shows the given items (the rest are hidden) and focuses the first, for the arrow keys.
 function showContextItems(shown) {
-  for (const name of ["info", "tags", "remove", "reload"]) {
+  for (const name of ["info", "tags", "remove", "reload", "install"]) {
     const item = elements[`context-${name}`];
     item.classList.toggle("hidden", !shown[name]);
     item.classList.toggle("flex", !!shown[name]);
-    item.disabled = busy && name !== "reload";
+    item.disabled = busy && name !== "reload" && name !== "install";
   }
 }
 
@@ -1750,7 +1750,7 @@ function placeContextMenu(x, y) {
 // Anywhere else, the menu holds what applies to the whole app.
 function openGeneralMenu(event) {
   hideContextMenu();
-  showContextItems({ reload: true });
+  showContextItems({ reload: true, install: !!installPrompt });
   const keyboard = event.clientX === 0 && event.clientY === 0;
   placeContextMenu(keyboard ? 24 : event.clientX, keyboard ? 24 : event.clientY);
 }
@@ -3686,6 +3686,26 @@ document.addEventListener("contextmenu", event => {
   if (!rowMenuOpen && !event.target.closest?.("dialog, [data-no-context-menu]")) openGeneralMenu(event);
 });
 elements["context-reload"].addEventListener("click", () => location.reload());
+
+// Installing as an app (its own window, the Start menu; see manifest.webmanifest). The browser says when it can be
+// installed; until then, and once installed, the menu doesn't offer it.
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  installPrompt = event;
+});
+window.addEventListener("appinstalled", () => { installPrompt = null; });
+elements["context-install"].addEventListener("click", async () => {
+  hideContextMenu();
+  const prompt = installPrompt;
+  if (!prompt) return;
+  installPrompt = null;
+  await prompt.prompt();
+});
+// Lets the installed app start without a connection (see sw.js).
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(error => console.error("Could not set up offline use:", error));
+}
 elements["clear-playlist"].addEventListener("click", () => {
   const count = playlistPaths().length;
   if (window.confirm(`Clear the current playlist (${count} ${count === 1 ? "track" : "tracks"})?`)) updatePlaylist([]);
