@@ -99,12 +99,37 @@
 
         <section data-panel id="library-view" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-bd bg-surface shadow-sm" aria-labelledby="library-heading">
           <div class="border-b border-bd-2 bg-head px-4 py-3 sm:px-6">
-            <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <h2 id="library-heading" tabindex="-1" class="text-lg font-semibold tracking-tight"><span id="library-title" class="flex flex-wrap items-center gap-x-1.5">Tracks</span></h2>
-              <div id="library-meta" class="flex flex-wrap gap-2 text-sm"></div>
-              <button id="source-filter" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="source-filter-menu" title="Filter by source" class="group ml-auto hidden h-[34px] max-w-[14rem] shrink-0 items-center gap-1.5 rounded-md border border-bd-in bg-field pl-2.5 pr-1.5 text-sm text-fg-2 hover:bg-tint-2 aria-expanded:border-primary data-[filtered]:border-bd-acc data-[filtered]:bg-accent-soft data-[filtered]:text-deep"><svg aria-hidden="true" class="h-4 w-4 shrink-0"><use href="#icon-folder"></use></svg><span id="source-filter-label" class="truncate">All sources</span><svg aria-hidden="true" class="h-4 w-4 shrink-0 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
-              <div id="source-filter-menu" role="group" aria-label="Sources to show" class="fixed z-50 hidden max-h-80 min-w-[12rem] max-w-[20rem] overflow-y-auto rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg"></div>
-              <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="min-w-[10rem] flex-1 rounded-md border border-bd-in bg-field px-3 py-1.5 text-base outline-none placeholder:text-faint focus:border-primary focus:bg-surface sm:max-w-xs">
+            <!-- Album views: two rows that don't wrap (the title and counts, then the controls), an album page's cover
+                 spanning both. Elsewhere the rows dissolve into one wrapping row (render sets the classes). -->
+            <div class="flex min-w-0 items-center gap-4">
+              <!-- An album's cover, on its own page. -->
+              <img id="library-cover" alt="" draggable="false" title="View full size" class="hidden h-[4.25rem] w-[4.25rem] shrink-0 cursor-zoom-in rounded-md border border-bd object-cover">
+              <div id="library-header-rows" class="flex min-w-0 flex-1 flex-col gap-2">
+                <div id="library-header-top" class="flex min-w-0 items-center gap-x-6">
+                  <h2 id="library-heading" tabindex="-1" class="min-w-0 text-lg font-semibold tracking-tight"><span id="library-title" class="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap">Tracks</span></h2>
+                  <div id="library-meta" class="flex shrink-0 gap-2 whitespace-nowrap text-sm"></div>
+                </div>
+                <div id="library-header-controls" class="flex min-w-0 items-center gap-2">
+                  <!-- The controls every view has come first; then those only album lists have. -->
+                  <div id="library-header-static" class="flex min-w-0 flex-1 items-center justify-end gap-2">
+                    <button id="source-filter" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="source-filter-menu" title="Filter by source" class="group hidden h-[34px] max-w-[14rem] shrink-0 items-center gap-1.5 rounded-md border border-bd-in bg-field pl-2.5 pr-1.5 text-sm text-fg-2 hover:bg-tint-2 aria-expanded:border-primary data-[filtered]:border-bd-acc data-[filtered]:bg-accent-soft data-[filtered]:text-deep"><svg aria-hidden="true" class="h-4 w-4 shrink-0"><use href="#icon-folder"></use></svg><span id="source-filter-label" class="truncate">All sources</span><svg aria-hidden="true" class="h-4 w-4 shrink-0 transition-transform group-aria-expanded:rotate-180"><use href="#icon-chevron"></use></svg></button>
+                    <div id="source-filter-menu" role="group" aria-label="Sources to show" class="fixed z-50 hidden max-h-80 min-w-[12rem] max-w-[20rem] overflow-y-auto rounded-md border border-bd bg-surface py-1 text-sm text-fg-2 shadow-lg"></div>
+                    <label class="sr-only" for="search">Search tracks</label><input id="search" type="search" placeholder="Search library" class="min-w-[10rem] flex-1 rounded-md border border-bd-in bg-field px-3 py-1.5 text-base outline-none placeholder:text-faint focus:border-primary focus:bg-surface sm:max-w-xs">
+                  </div>
+                  <!-- Album lists as a list or a grid of covers; a grid has no column headings, so it sorts here. -->
+                  <div id="album-view-controls" class="hidden shrink-0 items-center gap-2">
+                    <div role="group" aria-label="Album view" class="flex overflow-hidden rounded-md border border-bd-in text-sm">
+                      <button type="button" data-album-view="list" class="px-2.5 py-1">List</button>
+                      <button type="button" data-album-view="grid" class="border-l border-bd-in px-2.5 py-1">Grid</button>
+                    </div>
+                    <div id="album-sort-controls" class="hidden items-center gap-1 text-sm">
+                      <label for="album-sort" class="sr-only">Sort albums by</label>
+                      <select id="album-sort" class="rounded-md border border-bd-in bg-field py-1 pl-2 pr-7 text-sm text-fg-2 outline-none focus:border-primary"></select>
+                      <button id="album-sort-direction" type="button" class="flex h-[30px] w-[30px] items-center justify-center rounded-md border border-bd-in bg-field text-fg-2 hover:bg-tint-2"></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="max-h-80 overflow-auto lg:max-h-none lg:flex-1">
@@ -124,6 +149,7 @@
               </thead>
               <tbody id="group-rows"></tbody>
             </table>
+            <div id="album-grid" class="hidden grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-4 gap-y-5 p-4 sm:px-6"></div>
             <table id="tracks-table" class="w-full min-w-[480px] table-fixed border-collapse text-base">
               <colgroup><col class="w-14"><col class="w-16"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-[4.5rem]"><col class="w-24"></colgroup>
               <thead class="sticky top-0 z-10 bg-head text-soft">
@@ -235,9 +261,16 @@
 
         <div class="flex min-h-0 min-w-0 flex-col gap-4 lg:w-[clamp(380px,32vw,460px)] lg:shrink-0 lg:overflow-y-auto">
           <section data-panel class="shrink-0 rounded-xl border border-bd bg-surface p-5 shadow-sm" aria-label="Playback controls">
-            <div class="min-w-0">
-              <p id="now-playing" class="h-6 truncate text-base font-semibold text-fg-2">Nothing playing</p>
-              <p id="now-artist" class="mt-1 h-6 truncate text-base text-soft"></p>
+            <div class="flex min-w-0 items-center gap-3">
+              <!-- The playing track's cover; a disc stands in without one. -->
+              <div class="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-bd bg-subtle text-faint">
+                <svg aria-hidden="true" class="absolute inset-0 m-auto h-6 w-6"><use href="#icon-disc"></use></svg>
+                <img id="now-cover" alt="" draggable="false" title="View full size" class="absolute inset-0 hidden h-full w-full cursor-zoom-in object-cover">
+              </div>
+              <div class="min-w-0 flex-1">
+                <p id="now-playing" class="h-6 truncate text-base font-semibold text-fg-2">Nothing playing</p>
+                <p id="now-artist" class="mt-1 h-6 truncate text-base text-soft"></p>
+              </div>
             </div>
             <div class="mt-4 flex items-center gap-2 text-base tabular-nums text-soft">
               <span id="elapsed" class="w-10 shrink-0 text-center">0:00</span>

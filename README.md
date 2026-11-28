@@ -7,6 +7,7 @@ Requires a Chromium-based browser (File System Access API) over HTTPS or localho
 ## Features
 
 - **Sources:** add one or more folders (or drag them onto the add button); rescan, reconnect or remove each, or all at once. Folders with the same name are told apart by their contents.
+- **Cover art:** from the track's tag, or a `cover.jpg` / `folder.jpg` (and the like) next to it. Shown by the playing track, on album rows and album pages, and as a grid of albums (List / Grid in the album lists). Thumbnails are kept, so lists of covers are quick after a reload.
 - **Library:** browse by artist, album or track; search, sort any column (kept in the address), filter by source, add to the playlist or play from anywhere.
 - **Tag editor:** edit an MP3's (in the library or dropped) title, artist, album, genre, track number and year; album artist, composer, lyricist, copyright, disc and comment; embedded lyrics; and the `.lrc` / `.txt` lyrics files next to it (for library tracks and dropped folders), created when missing and deleted when emptied (right-click a track in the library or a playlist). Only the changed fields are written into the file; cover art, embedded lyrics and other tag data are kept. The first save in a folder asks for permission to change files there.
 - **Media info:** everything about a track's file, like MediaInfo (right-click a track): exact duration and bit rate from every MPEG frame, sample rate, channel mode, encoder and its settings, each ID3v2 frame (with cover art), ID3v1 and APE tags. Copy puts it all on the clipboard as text.

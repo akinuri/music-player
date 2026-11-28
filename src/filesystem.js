@@ -53,6 +53,25 @@ export async function findSiblingFile(directory, path, extension) {
   return handle ? handle.getFile() : null;
 }
 
+// Names that folder cover images commonly go by, most specific first.
+const FOLDER_IMAGE = /^(cover|folder|front|albumart(small|large)?|album)\.(jpe?g|png|webp|gif)$/i;
+
+// The cover image in the folder of `path` (cover.jpg, folder.png, …), or null.
+export async function findFolderImage(directory, path) {
+  const parts = path.split("/");
+  parts.pop();
+  for (const part of parts) {
+    directory = await directory.getDirectoryHandle(part);
+  }
+  const images = [];
+  for await (const [name, handle] of directory.entries()) {
+    if (handle.kind === "file" && FOLDER_IMAGE.test(name)) images.push({ name, handle });
+  }
+  const rank = name => ["cover", "folder", "front", "albumart", "album"].findIndex(word => name.toLowerCase().startsWith(word));
+  images.sort((a, b) => rank(a.name) - rank(b.name));
+  return images.length ? images[0].handle.getFile() : null;
+}
+
 // The same, for writing: the folder it's in, its name (as found, or as it would be created) and its handle (null when
 // there is no such file yet).
 export async function findSibling(directory, path, extension) {

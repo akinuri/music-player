@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import jsmediatags from "jsmediatags/dist/jsmediatags.min.js";
-import { frameText, genreText, languageFrameContent, readFields, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
+import { frameText, genreText, languageFrameContent, readCover, readFields, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
 
 const ascii = text => Array.from(text, char => char.charCodeAt(0));
 const be32 = value => [(value >>> 24) & 0xff, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
@@ -169,4 +169,15 @@ test("the comment is the undescribed one; players' described comments stay as th
   assert.deepEqual([...readTagFrames(added).frames[0].raw], itunes);
   assert.equal(readFields(added).comment, "Note");
   assert.equal(readFields(writeTags(original, { comment: "" })).comment, undefined);
+});
+
+test("the cover is the front-cover picture, else the first one", () => {
+  const picture = (type, bytes) => frame("APIC", [0, ...ascii("image/jpeg"), 0, type, 0, ...bytes]);
+  const both = mp3([picture(4, [1, 1]), text("TIT2", "Clocks"), picture(3, [3, 3, 3])]);
+  assert.deepEqual(readCover(both), { mime: "image/jpeg", data: Uint8Array.of(3, 3, 3) });
+  assert.deepEqual([...readCover(mp3([picture(0, [7])])).data], [7]);
+  assert.equal(readCover(mp3([text("TIT2", "Clocks")])), null);
+  assert.equal(readCover(Uint8Array.from(AUDIO)), null);
+  // Bare formats ("PNG") read as image types.
+  assert.equal(readCover(mp3([frame("APIC", [0, ...ascii("PNG"), 0, 3, 0, 9])])).mime, "image/png");
 });

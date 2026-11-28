@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findAudioFiles, findSiblingFile, getTrackFile, isAudioFile, listContents, scanLibrary } from "../src/filesystem.js";
+import { findAudioFiles, findFolderImage, findSiblingFile, getTrackFile, isAudioFile, listContents, scanLibrary } from "../src/filesystem.js";
 
 function file(name, overrides = {}) {
   return { kind: "file", getFile: async () => ({ name, size: 12, lastModified: 1, ...overrides }) };
@@ -89,4 +89,23 @@ test("finds playable audio of common formats recursively, for dropped folders", 
   assert.deepEqual(paths, ["a.MP3", "disc 2/b.flac", "disc 2/c.m4a"]);
   assert.equal(isAudioFile("x.opus"), true);
   assert.equal(isAudioFile("x.mp3.txt"), false);
+});
+
+test("the folder's cover image is found by its usual names, the most specific first", async () => {
+  const withDirectories = entries => {
+    const folder = directory(entries);
+    folder.getDirectoryHandle = async name => entries.find(([entry]) => entry === name)[1];
+    return folder;
+  };
+  const album = withDirectories([
+    ["01 - Song.mp3", file("01 - Song.mp3")],
+    ["Folder.JPG", file("Folder.JPG")],
+    ["cover.png", file("cover.png")],
+    ["covers.jpg", file("covers.jpg")],
+    ["back.jpg", file("back.jpg")]
+  ]);
+  const root = withDirectories([["Album", album]]);
+  assert.equal((await findFolderImage(root, "Album/01 - Song.mp3")).name, "cover.png");
+  assert.equal(await findFolderImage(withDirectories([["back.jpg", file("back.jpg")]]), "song.mp3"), null);
+  assert.equal((await findFolderImage(withDirectories([["AlbumArtSmall.jpg", file("AlbumArtSmall.jpg")]]), "song.mp3")).name, "AlbumArtSmall.jpg");
 });

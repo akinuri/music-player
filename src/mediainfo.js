@@ -2,7 +2,7 @@
 // (every MPEG frame, the Xing/Info/VBRI and LAME headers, ID3v2 with each frame, ID3v1 and APE tags); other formats
 // get their file details only. Pure: the caller reads the file and shows the sections.
 
-import { decodeText, genreText, languageFrameContent, readTagFrames, terminator } from "./id3.js";
+import { decodeText, genreText, languageFrameContent, parsePicture, readTagFrames, terminator } from "./id3.js";
 
 // Kilobits per second by version (1, or 2 for MPEG-2 and 2.5), layer and the header's index.
 const BITRATES = {
@@ -193,21 +193,11 @@ function describeFrame(id, data) {
     return { value: `${shown}${description ? ` (${description})` : ""}${language.trim() && language !== "XXX" ? ` [${language}]` : ""}` };
   }
   if (id === "APIC") {
-    const mimeEnd = data.indexOf(0, 1);
-    const mime = latin1(data.subarray(1, mimeEnd)) || "image/";
-    const type = data[mimeEnd + 1];
-    let description = "";
-    let rest = mimeEnd + 2;
-    const width = terminator(encoding).length;
-    let end = rest;
-    while (end + width <= data.length && !(data[end] === 0 && (width === 1 || data[end + 1] === 0))) end += width;
-    description = decodeText(data.subarray(rest, end), encoding);
-    rest = Math.min(data.length, end + width);
-    const image = data.subarray(rest);
-    const fullMime = mime.includes("/") ? mime : `image/${mime.toLowerCase()}`;
+    const { mime, type, description, image } = parsePicture(data);
+    const kind = PICTURE_TYPES[type] ?? `Type ${type}`;
     return {
-      value: `${PICTURE_TYPES[type] ?? `Type ${type}`}, ${fullMime}, ${formatBytes(image.length)}${description ? `, "${description}"` : ""}`,
-      picture: { mime: fullMime, type: PICTURE_TYPES[type] ?? `Type ${type}`, description, data: image }
+      value: `${kind}, ${mime}, ${formatBytes(image.length)}${description ? `, "${description}"` : ""}`,
+      picture: { mime, type: kind, description, data: image }
     };
   }
   if (id === "POPM") {

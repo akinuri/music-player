@@ -177,6 +177,31 @@ function languageFrame(id, { language, description, text }, version) {
   return frame(id, [encoding, ...Array.from(lang, char => char.charCodeAt(0) & 0xff), ...encodeText(description, encoding), ...terminator(encoding), ...encodeText(text, encoding)], version);
 }
 
+// A picture frame's (APIC) content, from its data (after the frame header): format, picture type (3 is the front
+// cover), description and the image itself.
+export function parsePicture(data) {
+  const encoding = data[0];
+  const mimeEnd = data.indexOf(0, 1);
+  const mime = String.fromCharCode(...data.subarray(1, mimeEnd < 0 ? 1 : mimeEnd)) || "image/";
+  const type = data[mimeEnd + 1];
+  const width = terminator(encoding).length;
+  let end = mimeEnd + 2;
+  while (end + width <= data.length && !(data[end] === 0 && (width === 1 || data[end + 1] === 0))) end += width;
+  return {
+    mime: mime.includes("/") ? mime : `image/${mime.toLowerCase()}`,
+    type,
+    description: decodeText(data.subarray(mimeEnd + 2, end), encoding),
+    image: data.subarray(Math.min(data.length, end + width))
+  };
+}
+
+// The cover in a tag (or a whole file): the front cover, else the first picture; null without one.
+export function readCover(bytes) {
+  const pictures = (readTagFrames(bytes)?.frames ?? []).filter(entry => entry.id === "APIC").map(entry => parsePicture(entry.raw.subarray(10)));
+  const picture = pictures.find(item => item.type === 3) ?? pictures[0];
+  return picture?.image.length ? { mime: picture.mime, data: picture.image } : null;
+}
+
 // Where a language field (lyrics, comment) is among the frames, or -1.
 function languageFrameIndex(frames, field) {
   const { id, isField } = LANGUAGE_FIELDS[field];

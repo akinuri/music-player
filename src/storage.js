@@ -3,6 +3,8 @@ const DB_NAME = "stillroom";
 const STORE = "library";
 const KEY = "current";
 const PLAYLIST_PREFIX = "playlist:";
+// Cover thumbnails, by track path and modification time (see covers.js); null records that a track has none.
+const COVER_PREFIX = "cover:";
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -51,4 +53,13 @@ export function saveSavedPlaylist(playlist) {
 
 export function deleteSavedPlaylist(id) {
   return transaction("readwrite", store => store.delete(`${PLAYLIST_PREFIX}${id}`));
+}
+
+// A thumbnail Blob, null when the track was found to have no cover, or undefined when it hasn't been looked at.
+export function loadCover(key) {
+  return transaction("readonly", store => store.get(`${COVER_PREFIX}${key}`));
+}
+
+export function saveCover(key, thumbnail) {
+  return transaction("readwrite", store => store.put(thumbnail, `${COVER_PREFIX}${key}`));
 }

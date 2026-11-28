@@ -2,6 +2,7 @@ import { findAudioFiles, findSibling, findSiblingFile, getTrackFile, getTrackFil
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
 import { readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { describeMedia, formatBytes, mediaInfoText } from "./mediainfo.js";
+import { Covers } from "./covers.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
 import { loadLibrary, saveLibrary, deleteLibrary, loadSavedPlaylists, saveSavedPlaylist, deleteSavedPlaylist } from "./storage.js";
 import { Playback } from "./playback.js";
@@ -15,7 +16,7 @@ import { migrateLibrary, relativePath, splitKey, withoutSource, withSourceTracks
 import { filterLibraryTracks, groupArtistLabel, groupKey, groupLibraryTracks, sortLibraryGroups, sortLibraryTracks } from "./library.js";
 
 const $ = id => document.getElementById(id);
-const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-reload", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle"].map(id => [id, $(id)]));
+const elements = Object.fromEntries(["choose-folder", "reconnect", "rescan", "reset-library", "sources-list", "sources-empty", "sources-footer", "sources-toggle", "sources-body", "sources-count", "sources-header", "source-filter", "source-filter-label", "source-filter-menu", "search", "track-count", "artist-nav-count", "album-nav-count", "track-nav-count", "library-heading", "library-title", "tracks-table", "track-rows", "groups-table", "group-rows", "group-albums-col", "group-albums-heading", "group-artist-col", "group-artist-heading", "group-year-col", "group-year-heading", "group-name-heading", "track-artist-col", "track-artist-heading", "track-album-col", "track-album-heading", "library-meta", "notice", "notice-content", "notice-progress", "dismiss-notice", "empty", "empty-title", "empty-description", "nav-library", "nav-artist", "nav-album", "nav-track", "nav-playlists", "nav-analysis", "nav-visualizer", "visualizer-view", "visualizer-empty", "nav-lyrics", "lyrics-view", "lyrics-meta", "lyrics-format", "lyrics-offset", "lyrics-earlier", "lyrics-later", "lyrics-offset-value", "lyrics-lines", "lyrics-empty", "analysis-view", "analysis-heading", "analysis-title", "analysis-meta", "analysis-albums", "analysis-tracks", "analysis-empty", "analysis-body", "analysis-chart", "analysis-detail", "playlist-nav-items", "library-view", "playlists-view", "saved-title", "saved-playlists-heading", "saved-meta", "saved-actions", "import-file", "rename-form", "rename-input", "rename-submit", "rename-cancel", "saved-playlists", "saved-empty", "playlist", "playlist-drop", "playlist-stats-tabs", "playlist-count", "playlist-nav-count", "playlist-duration", "playlist-empty", "save-playlist", "save-form", "playlist-name", "save-submit", "save-cancel", "generate-playlist", "generate-form", "generate-field", "generate-minutes", "generate-toggle", "generate-options", "generate-submit", "generate-cancel", "clear-playlist", "context-menu", "context-info", "context-tags", "context-remove", "context-reload", "now-playing", "now-artist", "previous", "play-pause", "stop", "next", "elapsed", "seek", "playback-duration", "speed", "speed-label", "speed-menu", "gap", "gap-label", "gap-menu", "mute", "volume", "volume-value", "cut-zone", "cut-handle", "now-cover", "library-cover", "library-header-rows", "library-header-top", "library-header-controls", "library-header-static", "album-grid", "album-view-controls", "album-sort-controls", "album-sort", "album-sort-direction"].map(id => [id, $(id)]));
 const sortButtons = document.querySelectorAll("[data-sort]");
 const groupSortButtons = document.querySelectorAll("[data-group-sort]");
 let library = null;
@@ -31,6 +32,9 @@ let sortBeforeAlbum = null;
 // Sort per grouped list: all artists, all albums, and one artist's albums (chronological by default, like a discography).
 const groupSortDefaults = { artist: "name", album: "name", artistAlbum: "year" };
 const groupSort = Object.fromEntries(Object.entries(groupSortDefaults).map(([slot, key]) => [slot, { key, direction: "ascending" }]));
+// Album lists as a table ("list") or cover cards ("grid"), remembered per browser.
+let albumView = "list";
+try { if (localStorage.getItem("albumView") === "grid") albumView = "grid"; } catch {}
 let selectedPlaylistId = null;
 let renamingId = null;
 let analysisMetric = "albums";
@@ -245,15 +249,17 @@ function renderCrumbs(container, crumbs) {
     if (index) {
       const separator = document.createElement("span");
       separator.setAttribute("aria-hidden", "true");
-      separator.className = "font-normal";
+      separator.className = "shrink-0 font-normal";
       separator.textContent = ">";
       container.append(separator);
     }
     const link = document.createElement("button");
     link.type = "button";
-    link.className = "font-medium text-deep-2 hover:text-deep hover:underline";
+    // Long names are cut short where the heading doesn't wrap, given in full on hover only then.
+    link.className = "min-w-0 truncate font-medium text-deep-2 hover:text-deep hover:underline";
     if (index === crumbs.length - 1) link.setAttribute("aria-current", "page");
     link.textContent = crumb.label;
+    link.addEventListener("pointerover", () => { link.title = link.scrollWidth > link.clientWidth ? crumb.label : ""; });
     link.addEventListener("click", crumb.action);
     container.append(link);
   });
@@ -320,7 +326,76 @@ function setPageTitle(text, scroll) {
   titleTimer = setInterval(tick, TITLE_STEP_MS);
 }
 
+// Cover art (see covers.js). Library tracks keep their thumbnails by path and modification time; dropped music only
+// for the session. A track whose folder needs reconnecting is simply tried again later.
+const covers = new Covers({
+  file: path => {
+    const drop = dropped.get(path);
+    if (drop) return droppedFile(drop).catch(() => null);
+    const source = sourceOf(path);
+    return source && permissionOf(source) === "granted" ? trackFile(path) : null;
+  },
+  folder: path => {
+    const drop = dropped.get(path);
+    if (drop) return drop.directory ? { directory: drop.directory, path: drop.relative } : null;
+    const source = sourceOf(path);
+    return source ? { directory: source.handle, path: relativePath(path) } : null;
+  },
+  key: path => {
+    const track = !isDropped(path) && trackFor(path);
+    return track ? `${path}@${track.lastModified ?? ""}:${track.size ?? ""}` : null;
+  }
+});
+
+// Covers in lists load as they come into view (a little before), not all at once.
+const coverObserver = new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    coverObserver.unobserve(entry.target);
+    entry.target.loadCover?.();
+  }
+}, { rootMargin: "200px" });
+
+// A square cover with a disc standing in until (or unless) there is one. size: Tailwind size classes. load(): the
+// cover's URL or null.
+function coverTile(size, load, { lazy = true } = {}) {
+  const tile = document.createElement("div");
+  tile.className = `relative shrink-0 overflow-hidden rounded-md border border-bd bg-subtle text-faint ${size}`;
+  tile.innerHTML = '<svg aria-hidden="true" class="absolute inset-0 m-auto h-2/5 w-2/5"><use href="#icon-disc"></use></svg>';
+  const image = document.createElement("img");
+  image.alt = "";
+  image.draggable = false;
+  image.className = "absolute inset-0 hidden h-full w-full object-cover";
+  tile.append(image);
+  tile.loadCover = () => load().then(url => {
+    if (!url) return;
+    image.src = url;
+    image.classList.remove("hidden");
+  });
+  if (lazy) coverObserver.observe(tile);
+  else tile.loadCover();
+  return tile;
+}
+
+// The playing track's cover in the player card, shown once it's known to be for the track still playing.
+let nowCoverPath;
+function renderNowCover() {
+  if (player.path === nowCoverPath) return;
+  nowCoverPath = player.path;
+  const image = elements["now-cover"];
+  image.classList.add("hidden");
+  image.removeAttribute("src");
+  if (!player.path) return;
+  const path = player.path;
+  covers.track(path).then(url => {
+    if (!url || player.path !== path) return;
+    image.src = url;
+    image.classList.remove("hidden");
+  });
+}
+
 function renderPlayback() {
+  renderNowCover();
   const track = trackFor(player.path);
   const index = playlistPaths().indexOf(player.path);
   setTitle(elements["now-playing"], player.path ? track?.title || relativePath(player.path) : "Nothing playing", track?.trackNumber);
@@ -1159,9 +1234,31 @@ function render() {
   meta.push(plural(filtered.length, "Track"), formatTotal(filtered));
   renderMeta(elements["library-meta"], meta);
   elements["library-meta"].classList.toggle("hidden", !library);
-  elements["tracks-table"].classList.toggle("hidden", grouped);
-  elements["groups-table"].classList.toggle("hidden", !grouped);
   const albumsPage = groupMode === "album" && !artistAlbums;
+  // Album lists (all albums, an artist's albums) can be shown as a grid of covers instead of the table.
+  const albumList = grouped && groupMode === "album";
+  const gridView = albumList && albumView === "grid";
+  elements["tracks-table"].classList.toggle("hidden", grouped);
+  elements["groups-table"].classList.toggle("hidden", !grouped || gridView);
+  elements["album-grid"].classList.toggle("hidden", !gridView);
+  elements["album-grid"].classList.toggle("grid", gridView);
+  renderAlbumViewControls(albumList, gridView, sortSlot, albumsPage);
+  // Album views have more in their header (view and sort controls, the cover): two rows that don't wrap. Other views
+  // keep one wrapping row, the two rows' contents flowing into it.
+  const twoRows = groupMode === "album";
+  elements["library-header-rows"].className = twoRows ? "flex min-w-0 flex-1 flex-col gap-2" : "flex min-w-0 flex-1 flex-wrap items-center gap-x-6 gap-y-2";
+  elements["library-header-top"].className = twoRows ? "flex min-w-0 items-center gap-x-6" : "contents";
+  elements["library-header-controls"].className = twoRows ? "flex min-w-0 items-center gap-2" : "contents";
+  // Source filter and search lead the controls row; in a single row they sit at its end, as they always have.
+  // In album views the album controls follow straight after, so the group doesn't stretch; search keeps its usual width.
+  elements["library-header-static"].classList.toggle("justify-end", !twoRows);
+  elements["library-header-static"].classList.toggle("flex-1", !twoRows);
+  elements.search.classList.toggle("sm:w-80", twoRows);
+  elements["library-title"].classList.toggle("whitespace-nowrap", twoRows);
+  elements["library-title"].classList.toggle("flex-wrap", !twoRows);
+  // An album's own page shows its cover by the title.
+  const albumPage = !grouped && ((libraryMode === "album" && libraryGroup !== null) || (artistAlbums && artistAlbum !== null));
+  renderLibraryCover(albumPage ? scoped : null, albumPage ? `${libraryMode}\n${libraryGroup}\n${artistAlbum}` : null);
   elements["group-artist-col"].classList.toggle("hidden", !albumsPage);
   elements["group-artist-heading"].classList.toggle("hidden", !albumsPage);
   elements["group-albums-col"].classList.toggle("hidden", groupMode !== "artist");
@@ -1187,10 +1284,23 @@ function render() {
   // Draw attention to the folder button until there is something to play.
   elements["choose-folder"].classList.toggle("motion-safe:animate-attention", !library && !elements["choose-folder"].disabled);
   renderSources();
+  // Covers of the rows about to be replaced needn't load any more.
+  coverObserver.disconnect();
   elements["group-rows"].replaceChildren();
+  elements["album-grid"].replaceChildren();
   elements["track-rows"].replaceChildren();
   if (grouped) {
     for (const [position, group] of groups.entries()) {
+      if (gridView) {
+        elements["album-grid"].append(albumCard(group, groupName(group.key, "album"), albumsPage, () => {
+          if (artistAlbums) artistAlbum = group.key;
+          else libraryGroup = group.key;
+          elements.search.value = "";
+          render();
+          elements["library-heading"].focus();
+        }));
+        continue;
+      }
       const row = document.createElement("tr");
       row.className = "cursor-pointer border-b border-bd-3 hover:bg-field last:border-b-0";
       const name = groupName(group.key, groupMode);
@@ -1212,7 +1322,14 @@ function render() {
       nameButton.textContent = name;
       nameButton.title = name;
       nameButton.addEventListener("click", open);
-      nameCell.append(nameButton);
+      if (groupMode === "album") {
+        // Albums carry a small cover before the name.
+        nameCell.className = "px-3 py-1.5";
+        const named = document.createElement("div");
+        named.className = "flex min-w-0 items-center gap-2.5";
+        named.append(coverTile("h-8 w-8", () => covers.album(group.tracks)), nameButton);
+        nameCell.append(named);
+      } else nameCell.append(nameButton);
       row.append(trackCell(String(position + 1), "tabular-nums text-faint-2"), nameCell);
       if (albumsPage) {
         const artistLabel = groupArtistLabel(group);
@@ -2515,6 +2632,108 @@ for (const sortButton of sortButtons) {
     render();
   });
 }
+// A card in the album grid: the cover, with play and add buttons showing on it, and the name, artist and year below.
+function albumCard(group, name, showArtist, open) {
+  const card = document.createElement("div");
+  card.className = "group min-w-0 cursor-pointer";
+  card.addEventListener("click", event => {
+    if (!event.target.closest("button")) open();
+  });
+  const cover = coverTile("aspect-square w-full shadow-sm transition-shadow group-hover:shadow-md", () => covers.album(group.tracks));
+  const paths = group.tracks.map(track => track.path);
+  const missing = paths.filter(path => !playlistPaths().includes(path));
+  const addGroup = () => missing.length ? updatePlaylist([...playlistPaths(), ...missing]) : Promise.resolve(true);
+  const actions = document.createElement("div");
+  actions.className = "absolute bottom-2 right-2 flex gap-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100";
+  actions.append(
+    button("play", `Play album: ${name}`, async () => {
+      if (await addGroup()) await playTrack(paths[0]);
+    }, busy, "small"),
+    button(missing.length ? "add" : "added", `${missing.length ? "Add to playlist" : "Added to playlist"}: ${name}`, addGroup, busy || !missing.length, "small")
+  );
+  cover.append(actions);
+  const title = document.createElement("button");
+  title.type = "button";
+  title.className = "mt-2 block max-w-full truncate text-left text-sm font-medium text-fg-2";
+  title.textContent = name;
+  title.title = name;
+  title.addEventListener("click", open);
+  const details = document.createElement("p");
+  details.className = "truncate text-sm text-soft";
+  details.textContent = [showArtist ? groupArtistLabel(group) : "", group.year ?? ""].filter(Boolean).join(" · ");
+  card.append(cover, title, details);
+  return card;
+}
+
+// The grid's sorts, as the table's column headings offer them (the artist only where albums of several show).
+const ALBUM_SORTS = [["name", "Name"], ["artist", "Artist"], ["year", "Year"], ["tracks", "Tracks"], ["duration", "Time"]];
+
+function renderAlbumViewControls(shown, grid, slot, withArtist) {
+  const controls = elements["album-view-controls"];
+  controls.classList.toggle("hidden", !shown);
+  controls.classList.toggle("flex", shown);
+  for (const choice of controls.querySelectorAll("[data-album-view]")) {
+    const active = choice.dataset.albumView === albumView;
+    choice.setAttribute("aria-pressed", String(active));
+    choice.classList.toggle("bg-sel", active);
+    choice.classList.toggle("font-semibold", active);
+    choice.classList.toggle("text-deep", active);
+    choice.classList.toggle("bg-field", !active);
+    choice.classList.toggle("hover:bg-tint-2", !active);
+  }
+  elements["album-sort-controls"].classList.toggle("hidden", !grid);
+  elements["album-sort-controls"].classList.toggle("flex", grid);
+  if (!grid) return;
+  const select = elements["album-sort"];
+  const options = ALBUM_SORTS.filter(([key]) => key !== "artist" || withArtist);
+  const signature = options.map(([key]) => key).join();
+  if (select.dataset.options !== signature) {
+    select.replaceChildren(...options.map(([value, label]) => new Option(label, value)));
+    select.dataset.options = signature;
+  }
+  const state = groupSort[slot];
+  select.value = options.some(([key]) => key === state.key) ? state.key : "name";
+  const ascending = state.direction === "ascending";
+  elements["album-sort-direction"].textContent = ascending ? "↑" : "↓";
+  elements["album-sort-direction"].title = ascending ? "Ascending" : "Descending";
+  elements["album-sort-direction"].setAttribute("aria-label", ascending ? "Ascending; switch to descending" : "Descending; switch to ascending");
+}
+
+// The cover by an album page's title; key tells pages apart, so it only changes when the page does.
+let libraryCoverKey = null;
+let libraryCoverTracks = null;
+function renderLibraryCover(tracks, key) {
+  libraryCoverTracks = tracks;
+  if (key === libraryCoverKey) return;
+  libraryCoverKey = key;
+  const image = elements["library-cover"];
+  image.classList.add("hidden");
+  image.removeAttribute("src");
+  if (!tracks?.length) return;
+  covers.album(tracks).then(url => {
+    if (!url || libraryCoverKey !== key) return;
+    image.src = url;
+    image.classList.remove("hidden");
+  });
+}
+
+for (const choice of document.querySelectorAll("[data-album-view]")) {
+  choice.addEventListener("click", () => {
+    albumView = choice.dataset.albumView;
+    try { localStorage.setItem("albumView", albumView); } catch {}
+    render();
+  });
+}
+elements["album-sort"].addEventListener("change", () => {
+  groupSort[libraryShape().sortSlot].key = elements["album-sort"].value;
+  render();
+});
+elements["album-sort-direction"].addEventListener("click", () => {
+  const state = groupSort[libraryShape().sortSlot];
+  state.direction = state.direction === "ascending" ? "descending" : "ascending";
+  render();
+});
+
 for (const sortButton of groupSortButtons) {
   sortButton.addEventListener("click", () => {
     const state = groupSort[libraryShape().sortSlot];
@@ -2780,8 +2999,11 @@ async function saveTags() {
       target.drop.file = file;
       await fillDropDetails([path]);
     }
-    // Embedded lyrics win in the Lyrics view; read them again.
+    // Embedded lyrics win in the Lyrics view; read them again. The cover too may come from the rewritten tag.
     lyricsCache.delete(path);
+    covers.forget(path);
+    if (nowCoverPath === path) nowCoverPath = undefined;
+    libraryCoverKey = null;
     tagEditing = null;
     tagEditor.close();
     const name = target.drop ? target.drop.label : relativePath(path);
@@ -3035,7 +3257,11 @@ for (const type of ["pointerup", "pointercancel"]) {
   });
 }
 
-function openImageViewer(url, caption) {
+// owned: the viewer made the URL for itself and lets it go when closed.
+let viewerOwnedUrl = null;
+function openImageViewer(url, caption, { owned = false } = {}) {
+  if (viewerOwnedUrl) URL.revokeObjectURL(viewerOwnedUrl);
+  viewerOwnedUrl = owned ? url : null;
   viewerImage.src = url;
   $("image-viewer-caption").textContent = caption;
   moveViewerImage(0, 0);
@@ -3049,6 +3275,38 @@ imageViewer.addEventListener("click", () => {
     return;
   }
   imageViewer.close();
+});
+imageViewer.addEventListener("close", () => {
+  // A picture already shown stays on screen while it fades out, so its URL can go now.
+  if (viewerOwnedUrl) URL.revokeObjectURL(viewerOwnedUrl);
+  viewerOwnedUrl = null;
+});
+
+// A cover at full size: load() gives the original image (not the thumbnail), shown with its size.
+async function viewCover(load) {
+  const image = await load().catch(error => {
+    console.error("Could not read the cover:", error);
+    return null;
+  });
+  if (!image) return;
+  const url = URL.createObjectURL(image);
+  const probe = new Image();
+  probe.src = url;
+  try {
+    await probe.decode();
+  } catch {
+    URL.revokeObjectURL(url);
+    notice("Couldn't show this cover.", true);
+    return;
+  }
+  openImageViewer(url, `Cover · ${probe.naturalWidth} × ${probe.naturalHeight} · ${formatBytes(image.size)}`, { owned: true });
+}
+// The covers by the playing track and on an album's page open it.
+elements["now-cover"].addEventListener("click", () => {
+  if (player.path) viewCover(() => covers.image(player.path));
+});
+elements["library-cover"].addEventListener("click", () => {
+  if (libraryCoverTracks?.length) viewCover(() => covers.albumImage(libraryCoverTracks));
 });
 
 $("media-info-close").addEventListener("click", () => mediaInfo.close());
