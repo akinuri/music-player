@@ -6,6 +6,10 @@
 @tailwind utilities;
 
 @layer base {
+/* Button labels say what a button does, not something to copy; clicking (or double-clicking) them doesn't select. */
+button {
+  user-select: none;
+}
 :root {
   color-scheme: light;
   --c-page: 233 238 238;
