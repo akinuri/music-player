@@ -49,6 +49,7 @@
       <symbol id="icon-gap" viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3v3a4 4 0 0 0 8 0V3M8 21v-3a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-load" viewBox="0 0 24 24"><path d="M4 5h10M4 10h10M4 15h6m4 0 3 3 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-disc" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-info" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </svg>
     <main class="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-4 px-4 pb-12 pt-5 sm:px-6 lg:h-screen lg:min-h-0 lg:px-8">
@@ -124,11 +125,11 @@
               <tbody id="group-rows"></tbody>
             </table>
             <table id="tracks-table" class="w-full min-w-[480px] table-fixed border-collapse text-base">
-              <colgroup><col class="w-14"><col class="w-20"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-[4.5rem]"><col class="w-24"></colgroup>
+              <colgroup><col class="w-14"><col class="w-16"><col><col id="track-artist-col"><col id="track-album-col"><col class="w-[4.5rem]"><col class="w-24"></colgroup>
               <thead class="sticky top-0 z-10 bg-head text-soft">
                 <tr class="border-b border-bd-2">
                   <th scope="col" class="px-3 py-2 text-left">#</th>
-                  <th scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" class="flex w-full items-center gap-2 text-left hover:text-deep"><span aria-hidden="true">Track</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
+                  <th scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="trackNumber" aria-label="Track number" title="Track number" class="flex w-full items-center gap-2 text-left hover:text-deep"><svg aria-hidden="true" class="h-4 w-4 shrink-0"><use href="#icon-disc"></use></svg><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
                   <th scope="col" aria-sort="ascending" class="px-3 py-2 text-left"><button type="button" data-sort="title" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Title</span><span data-sort-indicator aria-hidden="true" class="font-bold text-deep">↑</span></button></th>
                   <th id="track-artist-heading" scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="artist" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Artist</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
                   <th id="track-album-heading" scope="col" class="px-3 py-2 text-left"><button type="button" data-sort="album" class="flex w-full items-center gap-2 text-left hover:text-deep"><span>Album</span><span data-sort-indicator aria-hidden="true" class="opacity-50">↕</span></button></th>
