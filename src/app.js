@@ -2195,7 +2195,12 @@ async function fillDropDetails(keys) {
 // Dropped on the current playlist: an empty one becomes a new direct-play playlist; otherwise the music is appended
 // (and added to the direct-play playlist if that's the one loaded). Playback starts right away unless something plays.
 async function dropToPlaylist(dataTransfer) {
-  const drop = takeDrop(dataTransfer);
+  return addToPlaylist(takeDrop(dataTransfer));
+}
+
+// What dropToPlaylist does with a drop (see takeDrop), also used for files opened with the installed app. playNow:
+// play the first of them even if something is playing (opening a file means wanting to hear it).
+async function addToPlaylist(drop, { playNow = false } = {}) {
   let found, texts;
   try {
     ({ found, texts } = await readDrop(drop));
@@ -2229,7 +2234,7 @@ async function dropToPlaylist(dataTransfer) {
     message = direct ? `Added ${count} to "${direct.name}".` : `Added ${count}. Dropped music plays from its files and isn't added to the library.`;
   }
   notice(message);
-  if (!player.path || player.audio.paused) playTrack(keys[0]);
+  if (playNow || !player.path || player.audio.paused) playTrack(keys[0]);
   await fillDropDetails(keys);
 }
 
@@ -4330,4 +4335,14 @@ for (const button of themeButtons) button.addEventListener("click", () => setPre
 document.addEventListener("themechange", renderThemeSwitch);
 renderThemeSwitch();
 initTooltips();
-init();
+const ready = init();
+
+// Files opened with the installed app ("Open with", or a double-click once it's the default; see file_handlers in
+// manifest.webmanifest) arrive in the running window and are played like music dropped on the current playlist.
+if ("launchQueue" in window) {
+  window.launchQueue.setConsumer(async ({ files }) => {
+    if (!files?.length) return;
+    await ready;
+    await addToPlaylist({ count: files.length, files: [], handles: files.map(handle => Promise.resolve(handle)) }, { playNow: true });
+  });
+}

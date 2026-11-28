@@ -17,7 +17,7 @@ Requires a Chromium-based browser (File System Access API) over HTTPS or localho
 - **Lyrics:** read from the MP3's tags, or else a same-named `.lrc` or `.txt` file next to it (switchable in the Lyrics view; only the chosen format is looked for). Timed (LRC) lyrics follow along and seek on click; an offset per track shifts them when they were timed to a different recording.
 - **Visualizer:** live spectrum of the playing track as 2D bars or a rotatable 3D terrain of the song so far (parts missed in a background tab or skipped by jumping ahead are filled in from the file), which can be downloaded and loaded back; shown after 30 s without input while music plays.
 - **Analysis:** timeline of your library by release year, measured in albums or tracks.
-- **Installable:** install it as an app (the browser's install button, or right-click → Install app) to open it in its own window from the Start menu. It starts offline too, from a copy kept by its service worker.
+- **Installable:** install it as an app (the browser's install button, or right-click → Install app) to open it in its own window from the Start menu. It starts offline too, from a copy kept by its service worker. Installed, it can open audio files (Open with → Music player, or set it as the default): they play at once, like music dropped on the current playlist.
 - **Deep links:** the current view is kept in the address, so reloads and the back button work.
 
 ## Notes
