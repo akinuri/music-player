@@ -880,16 +880,35 @@ renderLyricsFormat();
 // Track count and duration for the whole playlist, or the part before/after the playing track (which itself is excluded).
 let playlistStats = "total";
 try { if (["total", "elapsed", "remaining"].includes(localStorage.getItem("playlistStats"))) playlistStats = localStorage.getItem("playlistStats"); } catch {}
+// How finely the playing track's heard time moves the Elapsed / Remaining figures (seconds).
+const PLAYLIST_STATS_STEP = 10;
 function renderPlaylistStats() {
   const paths = playlistPaths();
   const index = paths.indexOf(player.path);
   const part = playlistStats === "elapsed" ? paths.slice(0, Math.max(index, 0))
     : playlistStats === "remaining" ? paths.slice(index + 1)
     : paths;
-  elements["playlist-count"].textContent = `${part.length.toLocaleString()} ${part.length === 1 ? "Track" : "Tracks"}`;
+  // The playing track's time is split between the two: what's been heard of it is elapsed, the rest remaining. As a
+  // track it counts on the side it's mostly on: remaining until half of it has been heard, elapsed from then. Heard time
+  // goes in 10-second steps, so the figures settle rather than tick every second.
+  const playing = index >= 0 && playlistStats !== "total" ? trackFor(paths[index]) : null;
+  const heard = Math.floor((player.audio.currentTime || 0) / PLAYLIST_STATS_STEP) * PLAYLIST_STATS_STEP;
+  const mostlyHeard = (player.audio.currentTime || 0) >= (player.audio.duration || playing?.duration || Infinity) / 2;
+  const count = part.length + (playing && (playlistStats === "elapsed") === mostlyHeard ? 1 : 0);
+  elements["playlist-count"].textContent = `${count.toLocaleString()} ${count === 1 ? "Track" : "Tracks"}`;
   // Shown as listening time (playback speed and cut applied); the tooltip gives the tracks' own length when it differs.
   const tracks = part.map(path => trackFor(path) || { duration: null });
   const listening = tracks.map(track => ({ duration: listeningSeconds(track.duration) }));
+  if (playing && Number.isFinite(playing.duration)) {
+    const heardListening = heard / playbackSpeed;
+    if (playlistStats === "elapsed") {
+      tracks.push({ duration: heard });
+      listening.push({ duration: heardListening });
+    } else {
+      tracks.push({ duration: Math.max(0, playing.duration - heard) });
+      listening.push({ duration: Math.max(0, listeningSeconds(playing.duration) - heardListening) });
+    }
+  }
   // Gaps count between tracks: each elapsed track was followed by one, each remaining one is preceded by one.
   const gaps = Number.isFinite(playbackGap) && playbackGap > 0 ? (playlistStats === "total" ? Math.max(part.length - 1, 0) : part.length) : 0;
   if (gaps && listening.some(track => Number.isFinite(track.duration))) listening.push({ duration: gaps * playbackGap });
