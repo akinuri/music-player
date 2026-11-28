@@ -24,6 +24,8 @@ function attach(element) {
     offset: [0, 8],
     maxWidth: 320,
     touch: ["hold", 500],
+    // An open dialog sits above the whole page, so a tooltip for something in it goes in the dialog to be seen.
+    appendTo: reference => reference.closest("dialog") || document.body,
     onShow(instance) {
       const text = adoptTitle(instance.reference);
       if (!text) return false;

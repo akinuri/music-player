@@ -61,6 +61,22 @@ export function genreText(text) {
   }).filter(Boolean).join(", ");
 }
 
+// ID3v1: the old fixed 128-byte tag at the very end of a file (30 Latin-1 characters per text, a numbered genre; the
+// track number in "v1.1"). Read from the whole file or just its last 128 bytes; null without one.
+export function readId3v1(bytes) {
+  if (bytes.length < 128) return null;
+  const at = bytes.length - 128;
+  if (bytes[at] !== 0x54 || bytes[at + 1] !== 0x41 || bytes[at + 2] !== 0x47) return null;
+  const text = (from, length) => Array.from(bytes.subarray(at + from, at + from + length), byte => String.fromCharCode(byte)).join("").replace(/[\0 ]+$/, "");
+  const v11 = bytes[at + 125] === 0 && bytes[at + 126] !== 0;
+  return {
+    version: v11 ? "1.1" : "1.0",
+    title: text(3, 30), artist: text(33, 30), album: text(63, 30), year: text(93, 4),
+    comment: text(97, v11 ? 28 : 30), track: v11 ? bytes[at + 126] : null,
+    genre: bytes[at + 127] === 255 ? "" : genreText(`(${bytes[at + 127]})`)
+  };
+}
+
 // The length of the ID3v2 tag at the start of a file, from its first 10 bytes (0 without one), so the tag can be read
 // without the audio.
 export function tagLength(header) {
@@ -246,8 +262,9 @@ export function readFields(bytes) {
   return fields;
 }
 
-// changes: any of the fields in FRAMES and LANGUAGE_FIELDS; "" or null removes the field. Returns the new file.
-export function writeTags(bytes, changes) {
+// changes: any of the fields in FRAMES and LANGUAGE_FIELDS, and cover; "" or null removes the field.
+// dropId3v1: leave out the ID3v1 tag at the end, if there is one (it would keep the old values). Returns the new file.
+export function writeTags(bytes, changes, { dropId3v1 = false } = {}) {
   const existing = readTagFrames(bytes);
   const version = existing?.version ?? 3;
   let frames = existing?.frames ?? [];
@@ -296,7 +313,7 @@ export function writeTags(bytes, changes) {
   const parts = [...added, ...kept];
   const padding = 1024;
   const size = parts.reduce((sum, part) => sum + part.length, 0) + padding;
-  const audio = bytes.subarray(existing?.audioStart ?? 0);
+  const audio = bytes.subarray(existing?.audioStart ?? 0, dropId3v1 && readId3v1(bytes) ? bytes.length - 128 : bytes.length);
   const output = new Uint8Array(10 + size + audio.length);
   output.set([0x49, 0x44, 0x33, version, 0, 0], 0);
   output.set(toSynchsafe(size), 6);

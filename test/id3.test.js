@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import jsmediatags from "jsmediatags/dist/jsmediatags.min.js";
-import { frameText, genreText, languageFrameContent, readCover, readFields, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
+import { frameText, genreText, languageFrameContent, readCover, readFields, readId3v1, readGenre, readLyricsText, readTagFrames, tagLength, TagWriteError, writeTags } from "../src/id3.js";
 
 const ascii = text => Array.from(text, char => char.charCodeAt(0));
 const be32 = value => [(value >>> 24) & 0xff, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
@@ -214,3 +214,27 @@ test("a file without pictures gets a front cover; removing the cover leaves the 
 function parsePictureType(raw) {
   return raw[10 + 1 + raw.subarray(11).indexOf(0) + 1];
 }
+
+const v1Tag = ({ title = "", artist = "", album = "", year = "", comment = "", track = 0, genre = 255 }) => {
+  const field = (text, length) => [...ascii(text), ...new Array(length - text.length).fill(0)];
+  return [...ascii("TAG"), ...field(title, 30), ...field(artist, 30), ...field(album, 30), ...field(year, 4), ...field(comment, 28), 0, track, genre];
+};
+
+test("ID3v1 is read from the end of a file, with v1.1's track number and the numbered genre", () => {
+  const bytes = Uint8Array.from([...mp3([text("TIT2", "Clocks 1")]), ...v1Tag({ title: "Clocks", artist: "Coldplay", year: "2002", comment: "Rip", track: 5, genre: 17 })]);
+  assert.deepEqual(readId3v1(bytes), { version: "1.1", title: "Clocks", artist: "Coldplay", album: "", year: "2002", comment: "Rip", track: 5, genre: "Rock" });
+  assert.deepEqual(readId3v1(bytes.subarray(bytes.length - 128)), readId3v1(bytes));
+  assert.equal(readId3v1(mp3([text("TIT2", "Clocks")])), null);
+});
+
+test("saving can drop the ID3v1 tag; the audio before it stays whole", () => {
+  const original = Uint8Array.from([...mp3([text("TIT2", "Clocks")]), ...v1Tag({ title: "Clocks" })]);
+  const kept = writeTags(original, { title: "Clocks 2" });
+  assert.equal(readId3v1(kept).title, "Clocks");
+  const dropped = writeTags(original, { title: "Clocks 2" }, { dropId3v1: true });
+  assert.equal(readId3v1(dropped), null);
+  assert.deepEqual([...dropped.subarray(dropped.length - AUDIO.length)], AUDIO);
+  assert.equal(dropped.length, kept.length - 128);
+  // Without an ID3v1 tag, dropping changes nothing.
+  assert.deepEqual(writeTags(mp3([text("TIT2", "A")]), { title: "B" }, { dropId3v1: true }), writeTags(mp3([text("TIT2", "A")]), { title: "B" }));
+});

@@ -1,6 +1,6 @@
 import { findAudioFiles, findFolderImage, findSibling, findSiblingFile, getTrackFile, getTrackFileHandle, isAudioFile, listContents, scanLibrary } from "./filesystem.js";
 import { readLyrics, readMetadata, readTags } from "./metadata.js";
-import { readCover, readFields, tagLength, TagWriteError, writeTags } from "./id3.js";
+import { readCover, readFields, readId3v1, tagLength, TagWriteError, writeTags } from "./id3.js";
 import { describeMedia, formatBytes, mediaInfoText } from "./mediainfo.js";
 import { Covers } from "./covers.js";
 import { activeLyricIndex, decodeText, formatOffset, isLyricsFile, LYRICS_FORMATS, lyricsFormat, parseLyrics, roundOffset } from "./lyrics.js";
@@ -2874,10 +2874,12 @@ async function openTagEditor(path) {
   let tags = null;
   let own = {};
   let cover = null;
+  let v1 = null;
   try {
     // Dropped music may need its access asked for again after a reload (this menu click allows it).
     const file = target.drop ? await droppedFile(target.drop, { ask: true }) : await trackFile(path);
     tags = await readTags(file);
+    v1 = readId3v1(new Uint8Array(await file.slice(-128).arrayBuffer()));
     const length = tagLength(new Uint8Array(await file.slice(0, 10).arrayBuffer()));
     if (length) {
       const tag = new Uint8Array(await file.slice(0, length).arrayBuffer());
@@ -2916,8 +2918,9 @@ async function openTagEditor(path) {
       : entry.handle ? "" : `No ${entry.name} yet. Saving creates it.`;
   }
   // The cover as opened and as it is now (the same object until it's replaced or removed).
-  tagEditing = { path, original, files, cover: { original: cover, current: cover, folderImage: folderImage?.name ?? null } };
+  tagEditing = { path, original, files, cover: { original: cover, current: cover, folderImage: folderImage?.name ?? null }, v1 };
   renderTagCover();
+  renderTagV1();
   for (const field of TAG_FIELDS) $(`tag-${field}`).value = original[field];
   const fileLabel = target.drop ? target.drop.label : relativePath(path);
   $("tag-file").textContent = fileLabel;
@@ -2939,7 +2942,8 @@ async function saveTags() {
   }
   if (editing.cover.current !== editing.cover.original) changes.cover = editing.cover.current && { mime: editing.cover.current.mime, data: editing.cover.current.data };
   const fileChanges = LYRICS_FORMATS.filter(format => editing.files[format.id] && lyricsFileBox(format).value !== editing.files[format.id].text);
-  const tagsChanged = Object.keys(changes).length > 0;
+  // An ID3v1 tag is dropped on save (see renderTagV1), so the file is rewritten for that alone.
+  const tagsChanged = Object.keys(changes).length > 0 || !!editing.v1;
   if (!tagsChanged && !fileChanges.length) {
     tagEditor.close();
     return;
@@ -2986,7 +2990,7 @@ async function saveTags() {
       return;
     }
     const handle = await target.fileHandle();
-    const bytes = writeTags(new Uint8Array(await (await handle.getFile()).arrayBuffer()), changes);
+    const bytes = writeTags(new Uint8Array(await (await handle.getFile()).arrayBuffer()), changes, { dropId3v1: true });
     // The browser writes to a copy and swaps it in on close, so a failure leaves the file as it was.
     const writable = await handle.createWritable();
     await writable.write(bytes);
@@ -3043,6 +3047,33 @@ async function saveTags() {
 
 // The editor moves by dragging the top of its header (title and file); a backdrop click would lose edits, so it pulses.
 const showTagEditor = setUpDialog(tagEditor, $("tag-editor-handle"), { keepOpen: true });
+
+// Files with an old ID3v1 tag (at the end of the file; it can't hold much and would keep old values after an edit):
+// it's dropped on save. "Copy from v1" first fills the fields that are empty from it, never overwriting.
+const V1_FIELDS = [["title", "title"], ["artist", "artist"], ["album", "album"], ["genre", "genre"], ["trackNumber", "track"], ["year", "year"], ["comment", "comment"]];
+
+// The fields the ID3v1 tag would fill: [field, value] for each that is empty here and has a value there.
+function v1Fills() {
+  const v1 = tagEditing?.v1;
+  if (!v1) return [];
+  return V1_FIELDS
+    .map(([field, key]) => [field, v1[key] === null || v1[key] === undefined ? "" : String(v1[key]).trim()])
+    .filter(([field, value]) => value && !(field === "year" && !/^\d{4}$/.test(value)) && !$(`tag-${field}`).value.trim());
+}
+
+function renderTagV1() {
+  const shown = !!tagEditing?.v1;
+  $("tag-v1").classList.toggle("hidden", !shown);
+  $("tag-v1").classList.toggle("flex", shown);
+}
+
+$("tag-v1-copy").addEventListener("click", () => {
+  const fills = v1Fills();
+  // Without empty fields it could fill, there's nothing to do.
+  if (!fills.length) return;
+  for (const [field, value] of fills) $(`tag-${field}`).value = value;
+  setTagStatus(`Filled ${fills.length === 1 ? "1 empty field" : `${fills.length} empty fields`} from the ID3v1 tag: ${fills.map(([field]) => $(`tag-${field}`).labels[0]?.textContent ?? field).join(", ")}.`);
+});
 
 // Clicking a field's label focuses it with the cursor at the end, instead of the browser's select-all.
 function focusAtEnd(input) {

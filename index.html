@@ -52,6 +52,7 @@
       <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-load" viewBox="0 0 24 24"><path d="M4 5h10M4 10h10M4 15h6m4 0 3 3 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-disc" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-help" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="icon-info" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </svg>
     <main class="mx-auto flex min-h-screen max-w-[1920px] flex-col gap-4 p-5 lg:h-screen lg:min-h-0">
@@ -340,9 +341,9 @@
         </div>
       </div>
     </main>
-    <dialog id="tag-editor" aria-labelledby="tag-editor-heading" class="w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-bd bg-surface p-0 text-fg shadow-lg backdrop:bg-black/40 backdrop:backdrop-blur-[1px]">
+    <dialog id="tag-editor" aria-labelledby="tag-editor-heading" class="w-[min(28rem,calc(100vw-2rem))] overflow-visible rounded-xl border border-bd bg-surface p-0 text-fg shadow-lg backdrop:bg-black/40 backdrop:backdrop-blur-[1px]">
       <form id="tag-form" class="flex flex-col gap-3 p-5">
-        <div id="tag-editor-header" class="-mx-5 -mt-5 mb-1 border-b border-bd-2 bg-head px-5 py-3">
+        <div id="tag-editor-header" class="-mx-5 -mt-5 mb-1 rounded-t-[11px] border-b border-bd-2 bg-head px-5 py-3">
           <div id="tag-editor-handle" class="-mx-5 -mt-3 flex min-w-0 cursor-move touch-none select-none items-baseline justify-between gap-4 px-5 pt-3">
             <h2 id="tag-editor-heading" class="shrink-0 text-lg font-semibold tracking-tight">Edit tags</h2>
             <p id="tag-file" class="min-w-0 truncate text-right text-sm text-faint"></p>
@@ -400,6 +401,11 @@
         </div>
         <p id="tag-status" class="hidden text-sm"></p>
         <div class="mt-1 flex justify-end gap-2">
+          <!-- Files with an old ID3v1 tag: it's dropped on save, after (optionally) filling empty fields from it. -->
+          <div id="tag-v1" class="mr-auto hidden select-none items-center gap-1.5">
+            <button id="tag-v1-copy" type="button" title="Fill empty fields from the ID3v1 tag" class="rounded-md border border-bd-in bg-field px-3 py-2 text-fg-2 hover:bg-tint-2">Copy from v1</button>
+            <span tabindex="0" title="Saving drops the old ID3v1 tag. Copy fills empty fields from it." class="flex h-6 w-6 cursor-help items-center justify-center rounded text-soft hover:text-fg-2"><svg aria-hidden="true" class="h-4 w-4"><use href="#icon-help"></use></svg><span class="sr-only">About the ID3v1 tag</span></span>
+          </div>
           <button id="tag-cancel" type="button" class="rounded-md border border-bd-in bg-field px-4 py-2 text-fg-2 hover:bg-tint-2">Cancel</button>
           <button id="tag-save" type="submit" class="rounded-md border border-primary-dark bg-primary px-4 py-2 font-medium text-on-primary hover:bg-primary-dark disabled:opacity-40">Save</button>
         </div>
@@ -415,9 +421,9 @@
     </dialog>
 
     <!-- Everything readable about a track's file (see src/mediainfo.js); filled when opened. -->
-    <dialog id="media-info" aria-labelledby="media-info-heading" class="w-[min(36rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-bd bg-surface p-0 text-fg shadow-lg backdrop:bg-black/40 backdrop:backdrop-blur-[1px]">
+    <dialog id="media-info" aria-labelledby="media-info-heading" class="w-[min(36rem,calc(100vw-2rem))] overflow-visible rounded-xl border border-bd bg-surface p-0 text-fg shadow-lg backdrop:bg-black/40 backdrop:backdrop-blur-[1px]">
       <div class="flex max-h-[min(80vh,48rem)] flex-col">
-        <div id="media-info-handle" class="flex min-w-0 cursor-move touch-none select-none items-baseline justify-between gap-4 border-b border-bd-2 bg-head px-5 py-3">
+        <div id="media-info-handle" class="flex min-w-0 cursor-move touch-none select-none items-baseline justify-between gap-4 rounded-t-[11px] border-b border-bd-2 bg-head px-5 py-3">
           <h2 id="media-info-heading" class="shrink-0 text-lg font-semibold tracking-tight">Media info</h2>
           <p id="media-info-file" class="min-w-0 truncate text-right text-sm text-faint"></p>
         </div>

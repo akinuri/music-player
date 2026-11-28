@@ -2,7 +2,7 @@
 // (every MPEG frame, the Xing/Info/VBRI and LAME headers, ID3v2 with each frame, ID3v1 and APE tags); other formats
 // get their file details only. Pure: the caller reads the file and shows the sections.
 
-import { decodeText, genreText, languageFrameContent, parsePicture, readTagFrames, terminator } from "./id3.js";
+import { decodeText, genreText, languageFrameContent, parsePicture, readId3v1, readTagFrames, terminator } from "./id3.js";
 
 // Kilobits per second by version (1, or 2 for MPEG-2 and 2.5), layer and the header's index.
 const BITRATES = {
@@ -139,19 +139,8 @@ function readVbrHeader(bytes, at, header) {
 // Where the trailing tags are: ID3v1 (the last 128 bytes) and APEv2 (just before it, or at the very end).
 function readTrailingTags(bytes) {
   let end = bytes.length;
-  let id3v1 = null;
-  if (end >= 128 && latin1(bytes.subarray(end - 128, end - 125)) === "TAG") {
-    const at = end - 128;
-    const text = (from, length) => latin1(bytes.subarray(at + from, at + from + length)).replace(/[\0 ]+$/, "");
-    const v11 = bytes[at + 125] === 0 && bytes[at + 126] !== 0;
-    id3v1 = {
-      version: v11 ? "1.1" : "1.0",
-      title: text(3, 30), artist: text(33, 30), album: text(63, 30), year: text(93, 4),
-      comment: text(97, v11 ? 28 : 30), track: v11 ? bytes[at + 126] : null,
-      genre: bytes[at + 127] === 255 ? "" : genreText(`(${bytes[at + 127]})`)
-    };
-    end = at;
-  }
+  const id3v1 = readId3v1(bytes);
+  if (id3v1) end -= 128;
   let ape = null;
   if (end >= 32 && latin1(bytes.subarray(end - 32, end - 24)) === "APETAGEX") {
     const footer = end - 32;
