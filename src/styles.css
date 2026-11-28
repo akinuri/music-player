@@ -192,9 +192,9 @@ html[data-focus] #focus-backdrop {
 
 /* The stage and the glass panels. */
 html[data-focus] #player-column {
+  /* As wide as the page (itself capped at 1920px). */
   width: 100%;
-  max-width: 76rem;
-  margin-inline: auto;
+  max-width: none;
   gap: 1.5rem;
   /* Not a scroller here (the playlist scrolls within its panel), so the panels' shadows aren't cut off. */
   overflow: visible;
@@ -288,7 +288,4 @@ html[data-focus] #focus-buttons {
   right: 1rem;
   width: auto;
 }
-/* With nothing beside it, the stage is centred on its own. */
-html[data-focus] #player-column.focus-alone {
-  max-width: 44rem;
-}
+

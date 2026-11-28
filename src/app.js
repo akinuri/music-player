@@ -3824,7 +3824,6 @@ function renderFocus() {
     button.title = `${shown ? "Hide" : "Show"} ${focusPanelNames[name]}`;
     button.setAttribute("aria-label", button.title);
   }
-  $("player-column").classList.toggle("focus-alone", !Object.values(focusPanels).some(Boolean));
   renderFocusArt();
 }
 
